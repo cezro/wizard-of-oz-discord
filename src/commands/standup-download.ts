@@ -3,19 +3,12 @@ import { STANDUP_DOWNLOAD_CUSTOM_ID } from "../egress/discord.js";
 import { discordJson } from "../utils/discord-api.js";
 import type { DiscordInteraction } from "../discord/interaction-utils.js";
 import { ephemeral, type InteractionResponse } from "../discord/interaction-utils.js";
+import {
+  resolveStandupMarkdownAttachment,
+  type MessageWithComponents,
+} from "../utils/standup-attachment.js";
 
 const INTERACTION_MESSAGE_COMPONENT = 3;
-
-interface MessageAttachment {
-  id: string;
-  url: string;
-  filename: string;
-}
-
-interface DiscordMessage {
-  id: string;
-  attachments: MessageAttachment[];
-}
 
 export function isStandupDownloadInteraction(
   interaction: DiscordInteraction,
@@ -36,14 +29,16 @@ export async function handleStandupDownloadInteraction(
     return ephemeral("Could not resolve the summary message.");
   }
 
-  let attachment = interaction.message?.attachments?.[0];
+  let message: MessageWithComponents = interaction.message ?? { attachments: [] };
+  let attachment = resolveStandupMarkdownAttachment(message);
+
   if (!attachment?.url) {
     try {
-      const message = await discordJson<DiscordMessage>(
+      message = await discordJson<MessageWithComponents & { id: string }>(
         config.discordBotToken,
         `/channels/${channelId}/messages/${messageId}`,
       );
-      attachment = message.attachments[0];
+      attachment = resolveStandupMarkdownAttachment(message);
     } catch (error) {
       console.error("[standup-download] failed to fetch summary message:", error);
       return ephemeral("Could not load the summary file. Try again later.");

@@ -21,6 +21,7 @@ const DISCORD_CONTENT_LIMIT = 2000;
 const COMPONENT_TYPE_ACTION_ROW = 1;
 const COMPONENT_TYPE_BUTTON = 2;
 const COMPONENT_TYPE_TEXT_DISPLAY = 10;
+const COMPONENT_TYPE_FILE = 13;
 const COMPONENT_TYPE_CONTAINER = 17;
 const BUTTON_STYLE_PRIMARY = 1;
 const BUTTON_STYLE_LINK = 5;
@@ -59,6 +60,8 @@ interface DiscordMessageComponent {
   label?: string;
   url?: string;
   custom_id?: string;
+  file?: { url: string };
+  spoiler?: boolean;
 }
 
 interface ComponentsV2MessageBody {
@@ -185,49 +188,47 @@ export async function broadcastResult(
     });
   }
 
-  const initialBody: ComponentsV2MessageBody = {
-    flags: IS_COMPONENTS_V2,
-    attachments: [{ id: 0, filename }],
-    components: [
-      {
-        type: COMPONENT_TYPE_CONTAINER,
-        accent_color: EMBED_COLOR,
-        components: containerChildren,
-      },
-      buildDownloadActionRow(BUTTON_STYLE_PRIMARY, {
-        custom_id: STANDUP_DOWNLOAD_CUSTOM_ID,
-      }),
-    ],
-  };
-
   const created = await postComponentsV2Message(
     config,
     target.channelId,
-    initialBody,
+    {
+      flags: IS_COMPONENTS_V2,
+      attachments: [{ id: 0, filename }],
+      components: buildSummaryComponents(containerChildren, filename, {
+        custom_id: STANDUP_DOWNLOAD_CUSTOM_ID,
+      }),
+    },
     { filename, content: exportMarkdown },
   );
 
   const attachment = created.attachments[0];
   if (!attachment?.url) {
     console.error(
-      "[egress/discord] Summary posted without attachment URL; download button may not work",
+      "[egress/discord] Summary posted without attachment URL; removing download button",
     );
+    try {
+      await patchChannelMessage(config, target.channelId, created.id, {
+        flags: IS_COMPONENTS_V2,
+        components: buildSummaryComponents(containerChildren, filename, null),
+        attachments: attachment
+          ? [{ id: attachment.id, filename: attachment.filename }]
+          : [],
+      });
+    } catch (error) {
+      console.error(
+        "[egress/discord] Failed to patch summary after missing attachment URL:",
+        error,
+      );
+    }
     return "summary";
   }
 
   try {
     await patchChannelMessage(config, target.channelId, created.id, {
       flags: IS_COMPONENTS_V2,
-      components: [
-        {
-          type: COMPONENT_TYPE_CONTAINER,
-          accent_color: EMBED_COLOR,
-          components: containerChildren,
-        },
-        buildDownloadActionRow(BUTTON_STYLE_LINK, {
-          url: attachment.url,
-        }),
-      ],
+      components: buildSummaryComponents(containerChildren, filename, {
+        url: attachment.url,
+      }),
       attachments: [{ id: attachment.id, filename: attachment.filename }],
     });
   } catch (error) {
@@ -238,6 +239,36 @@ export async function broadcastResult(
   }
 
   return "summary";
+}
+
+function buildSummaryComponents(
+  containerChildren: DiscordMessageComponent[],
+  filename: string,
+  downloadButton: { url: string } | { custom_id: string } | null,
+): DiscordMessageComponent[] {
+  const components: DiscordMessageComponent[] = [
+    {
+      type: COMPONENT_TYPE_CONTAINER,
+      accent_color: EMBED_COLOR,
+      components: containerChildren,
+    },
+    {
+      type: COMPONENT_TYPE_FILE,
+      file: { url: `attachment://${filename}` },
+      spoiler: true,
+    },
+  ];
+
+  if (downloadButton) {
+    components.push(
+      buildDownloadActionRow(
+        "url" in downloadButton ? BUTTON_STYLE_LINK : BUTTON_STYLE_PRIMARY,
+        downloadButton,
+      ),
+    );
+  }
+
+  return components;
 }
 
 function buildDownloadActionRow(

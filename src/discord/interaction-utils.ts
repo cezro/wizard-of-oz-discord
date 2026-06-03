@@ -1,3 +1,5 @@
+import type { MessageWithComponents } from "../utils/standup-attachment.js";
+
 interface InteractionOption {
   type: number;
   name: string;
@@ -16,10 +18,7 @@ export interface DiscordInteraction {
     component_type?: number;
     options?: InteractionOption[];
   };
-  message?: {
-    id: string;
-    attachments?: { id: string; url: string; filename: string }[];
-  };
+  message?: MessageWithComponents & { id: string };
   guild_id?: string;
   member?: {
     user: { id: string };
