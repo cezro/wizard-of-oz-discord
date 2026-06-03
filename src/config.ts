@@ -5,8 +5,6 @@ export interface AppConfig {
   discordBotToken: string;
   discordApplicationId: string;
   discordPublicKey: string;
-  discordGuildId?: string;
-  discordChannelIdOverride?: string;
   supabaseUrl: string;
   supabaseSecretKey: string;
   geminiApiKey: string;
@@ -26,6 +24,18 @@ function requireEnv(name: string): string {
 function optionalEnv(name: string): string | undefined {
   const value = process.env[name];
   return value?.trim() || undefined;
+}
+
+const DISCORD_SNOWFLAKE = /^\d{17,20}$/;
+
+function assertDiscordSnowflake(name: string, value: string): string {
+  if (!DISCORD_SNOWFLAKE.test(value)) {
+    throw new Error(
+      `${name} must be a numeric Discord ID (17–20 digits), not a placeholder. ` +
+        "Copy the value from the Discord Developer Portal (General Information).",
+    );
+  }
+  return value;
 }
 
 function loadSupabaseSecretKey(): string {
@@ -48,10 +58,11 @@ function loadSupabaseSecretKey(): string {
 export function loadConfig(): AppConfig {
   return {
     discordBotToken: requireEnv("DISCORD_BOT_TOKEN"),
-    discordApplicationId: requireEnv("DISCORD_APPLICATION_ID"),
+    discordApplicationId: assertDiscordSnowflake(
+      "DISCORD_APPLICATION_ID",
+      requireEnv("DISCORD_APPLICATION_ID"),
+    ),
     discordPublicKey: requireEnv("DISCORD_PUBLIC_KEY"),
-    discordGuildId: optionalEnv("DISCORD_GUILD_ID"),
-    discordChannelIdOverride: optionalEnv("DISCORD_CHANNEL_ID"),
     supabaseUrl: requireEnv("SUPABASE_URL"),
     supabaseSecretKey: loadSupabaseSecretKey(),
     geminiApiKey: requireEnv("GEMINI_API_KEY"),
@@ -67,16 +78,6 @@ const NO_CONFIG_MESSAGE =
 export async function resolveStandupTargets(
   config: AppConfig,
 ): Promise<StandupTarget[]> {
-  if (config.discordChannelIdOverride) {
-    return [
-      {
-        guildId: config.discordGuildId ?? "env-override",
-        channelId: config.discordChannelIdOverride,
-        timezone: process.env.STANDUP_TIMEZONE?.trim() || "Asia/Manila",
-      },
-    ];
-  }
-
   const targets = await getEnabledConfigs(config);
   if (targets.length === 0) {
     throw new Error(NO_CONFIG_MESSAGE);

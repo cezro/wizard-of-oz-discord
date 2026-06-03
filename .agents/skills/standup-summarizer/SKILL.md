@@ -32,7 +32,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 6. **Attribution:** Every bullet keeps Discord mentions (`<@userId>`) as ingested.
 7. **Egress:** Bot API only; rich embed title `📊 Daily Standup Summary - [date]`.
 8. **Cron security:** `Authorization: Bearer ${CRON_SECRET}` on `POST /cron/standup`.
-9. **Channel config:** Prefer Supabase via `/standup-config set`; `DISCORD_CHANNEL_ID` env is optional override only.
+9. **Channel config:** Per-server via Supabase only (`/standup-config set`); cron loads all enabled rows.
 
 ## File map
 

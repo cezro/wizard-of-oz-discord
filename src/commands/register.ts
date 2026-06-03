@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config.js";
-import { discordJson } from "../utils/discord-api.js";
+import { DiscordApiError, discordJson } from "../utils/discord-api.js";
 
 const MANAGE_GUILD_PERMISSION = "32";
 
@@ -48,19 +48,7 @@ const STANDUP_CONFIG_COMMAND = {
 export async function registerSlashCommands(config: AppConfig): Promise<void> {
   const commands = [STANDUP_CONFIG_COMMAND];
 
-  if (config.discordGuildId) {
-    await discordJson(
-      config.discordBotToken,
-      `/applications/${config.discordApplicationId}/guilds/${config.discordGuildId}/commands`,
-      {
-        method: "PUT",
-        body: JSON.stringify(commands),
-      },
-    );
-    console.log(
-      `Registered slash commands for guild ${config.discordGuildId}`,
-    );
-  } else {
+  try {
     await discordJson(
       config.discordBotToken,
       `/applications/${config.discordApplicationId}/commands`,
@@ -69,6 +57,15 @@ export async function registerSlashCommands(config: AppConfig): Promise<void> {
         body: JSON.stringify(commands),
       },
     );
-    console.log("Registered global slash commands");
+    console.log(
+      "Registered global slash commands (available in all servers; may take up to ~1 hour on first deploy)",
+    );
+  } catch (error) {
+    if (error instanceof DiscordApiError && error.status === 403) {
+      console.error(
+        "[commands/register] Forbidden — check the bot token and application ID.",
+      );
+    }
+    throw error;
   }
 }

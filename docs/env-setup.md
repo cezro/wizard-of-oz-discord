@@ -143,28 +143,14 @@ See [Google AI models](https://ai.google.dev/gemini-api/docs/models) for other o
 
 ---
 
-## Optional variables
+## Multi-server setup
 
-### `DISCORD_GUILD_ID`
+The bot works in **any server** you invite it to. No server or channel IDs go in `.env`.
 
-**What it is:** Your Discord server’s ID. When set, slash commands register to that server only (updates appear in seconds). When unset, commands register globally (can take up to an hour).
-
-**Where to get it:**
-
-1. Discord desktop or web → enable **Developer Mode**: **User Settings** → **Advanced** → **Developer Mode**.
-2. Right-click your server icon → **Copy Server ID**.
-
----
-
-### `DISCORD_CHANNEL_ID`
-
-**What it is:** Bypass for Supabase — if set, the bot always uses this channel and ignores DB config. Useful for debugging; normal setup uses `/standup-config set` instead.
-
-**Where to get it:**
-
-1. With Developer Mode on, right-click the standup channel → **Copy Channel ID**.
-
-**Leave unset** for the recommended flow (`/standup-config set` writes to Supabase).
+1. Invite the bot to each server (OAuth2 URL with `bot` + `applications.commands`).
+2. Slash commands register **globally** when the app starts (may take up to ~1 hour the first time).
+3. In **each** server, run `/standup-config set` to choose the standup channel and timezone (stored in Supabase).
+4. Cron (`POST /cron/standup`) runs the pipeline for **every enabled** server in the database.
 
 ---
 
@@ -192,13 +178,13 @@ Also check **Server Settings → Members** (search the bot name), not only the c
 
 ### Confirm membership (API)
 
-Set `DISCORD_GUILD_ID` in `.env` to your server ID (right-click server → Copy Server ID). Then:
+Enable **Developer Mode**, right-click your server → **Copy Server ID**, then check membership (replace `GUILD_ID` and use your bot token and application ID from `.env`):
 
 ```powershell
 # PowerShell (loads .env from project root)
 cd path\to\wizard-of-oz-discord
 node --import dotenv/config -e "
-const g = process.env.DISCORD_GUILD_ID;
+const g = 'GUILD_ID';
 const a = process.env.DISCORD_APPLICATION_ID;
 const t = process.env.DISCORD_BOT_TOKEN;
 fetch('https://discord.com/api/v10/guilds/' + g + '/members/' + a, {
@@ -207,7 +193,7 @@ fetch('https://discord.com/api/v10/guilds/' + g + '/members/' + a, {
 "
 ```
 
-Or with curl (replace placeholders):
+Or with curl:
 
 ```bash
 curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
@@ -218,7 +204,6 @@ curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
 |----------|---------|
 | **200** + member JSON | Bot is in the guild. If the sidebar still hides it, expand offline members or check channel vs server member views. |
 | **404** Unknown Member | Bot was not added with the `bot` scope; re-invite using the steps above. |
-| **400** on `guild_id` | `DISCORD_GUILD_ID` is missing or not a numeric snowflake ID. |
 
 `APPLICATION_ID` is the same value as `DISCORD_APPLICATION_ID`.
 

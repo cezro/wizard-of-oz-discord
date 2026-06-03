@@ -39,8 +39,8 @@ Use raw `fetch` for Discord REST (no `discord.js`).
 | `CRON_SECRET` | Yes | Bearer auth on `/cron/standup` |
 | `PORT` | No | Default `3000` |
 | `GEMINI_MODEL` | No | Default `gemini-3.1-flash-lite` |
-| `DISCORD_GUILD_ID` | No | Guild-scoped slash command registration (faster dev) |
-| `DISCORD_CHANNEL_ID` | No | Env override; skips Supabase lookup |
+
+Per-server settings (standup channel, timezone) live in **Supabase** via `/standup-config` in each Discord server — not in env vars. Slash commands register **globally** at startup.
 
 ## Discord bot setup
 
@@ -66,7 +66,7 @@ Requires **Manage Server** permission.
 2. Deploy; confirm `/health` returns OK.
 3. Set Interactions Endpoint URL in Discord to your Render URL.
 4. Cron: `0 9 * * 1-5` UTC → `POST /cron/standup` with `Authorization: Bearer <CRON_SECRET>`.
-5. Run `/standup-config set` in your server before the first cron run.
+5. Run `/standup-config set` in each server before that server's first cron run.
 
 ## Environment setup
 
