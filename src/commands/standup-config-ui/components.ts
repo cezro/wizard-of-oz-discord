@@ -12,16 +12,30 @@ export const BTN_DANGER = 4;
 export const EMBED_COLOR = 0x5865f2;
 export const EMBED_COLOR_OK = 0x57f287;
 
-export function hourOptions(): { label: string; value: string }[] {
+export type SelectOption = {
+  label: string;
+  value: string;
+  default?: boolean;
+};
+
+export function hourOptions(selectedHour?: number | null): SelectOption[] {
   return Array.from({ length: 24 }, (_, h) => ({
     label: String(h).padStart(2, "0"),
     value: String(h),
+    ...(selectedHour !== null &&
+    selectedHour !== undefined &&
+    h === selectedHour
+      ? { default: true }
+      : {}),
   }));
 }
 
-export function minuteOptions(): { label: string; value: string }[] {
+export function minuteOptions(selectedMinute?: number): SelectOption[] {
   return [0, 15, 30, 45].map((m) => ({
     label: String(m).padStart(2, "0"),
     value: String(m),
+    ...(selectedMinute !== undefined && m === selectedMinute
+      ? { default: true }
+      : {}),
   }));
 }
