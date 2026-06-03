@@ -20,6 +20,19 @@ interface DiscordEmbed {
   footer?: { text: string };
 }
 
+interface AllowedMentions {
+  parse?: ("users" | "roles" | "everyone")[];
+  users?: string[];
+}
+
+interface ChannelMessageBody {
+  content?: string;
+  embeds?: DiscordEmbed[];
+  allowed_mentions?: AllowedMentions;
+}
+
+const MAX_ALLOWED_USER_MENTIONS = 100;
+
 export async function broadcastReminder(
   config: AppConfig,
   channelId: string,
@@ -35,32 +48,55 @@ export async function broadcastMissingReporterNudge(
   missingUserIds: string[],
 ): Promise<void> {
   const chunks = chunkMentionMessages(missingUserIds);
-  for (const content of chunks) {
-    await postChannelMessage(config, channelId, { content });
+  for (const chunk of chunks) {
+    await postChannelMessage(config, channelId, {
+      content: chunk.content,
+      allowed_mentions: {
+        parse: ["users"],
+        users: chunk.userIds,
+      },
+    });
   }
 }
 
-function chunkMentionMessages(userIds: string[]): string[] {
-  const mentions = userIds.map((id) => `<@${id}>`);
-  const messages: string[] = [];
-  let currentMentions: string[] = [];
+function chunkMentionMessages(
+  userIds: string[],
+): { content: string; userIds: string[] }[] {
+  const messages: { content: string; userIds: string[] }[] = [];
+  let currentIds: string[] = [];
 
-  for (const mention of mentions) {
-    const candidate = [...currentMentions, mention];
-    const content = MISSING_NUDGE_PREFIX + candidate.join(" ");
-    if (content.length > DISCORD_CONTENT_LIMIT && currentMentions.length > 0) {
-      messages.push(MISSING_NUDGE_PREFIX + currentMentions.join(" "));
-      currentMentions = [mention];
+  for (const id of userIds) {
+    const candidateIds = [...currentIds, id];
+    const content = buildMissingNudgeContent(candidateIds);
+    const overCharLimit =
+      content.length > DISCORD_CONTENT_LIMIT && currentIds.length > 0;
+    const overMentionLimit =
+      candidateIds.length > MAX_ALLOWED_USER_MENTIONS && currentIds.length > 0;
+
+    if (overCharLimit || overMentionLimit) {
+      messages.push({
+        content: buildMissingNudgeContent(currentIds),
+        userIds: [...currentIds],
+      });
+      currentIds = [id];
     } else {
-      currentMentions = candidate;
+      currentIds = candidateIds;
     }
   }
 
-  if (currentMentions.length > 0) {
-    messages.push(MISSING_NUDGE_PREFIX + currentMentions.join(" "));
+  if (currentIds.length > 0) {
+    messages.push({
+      content: buildMissingNudgeContent(currentIds),
+      userIds: [...currentIds],
+    });
   }
 
   return messages;
+}
+
+function buildMissingNudgeContent(userIds: string[]): string {
+  const mentions = userIds.map((id) => `<@${id}>`).join(" ");
+  return MISSING_NUDGE_PREFIX + mentions;
 }
 
 export async function broadcastResult(
@@ -111,7 +147,7 @@ function truncateEmbedDescription(markdown: string): {
 async function postChannelMessage(
   config: AppConfig,
   channelId: string,
-  body: { content?: string; embeds?: DiscordEmbed[] },
+  body: ChannelMessageBody,
 ): Promise<void> {
   await discordJson(
     config.discordBotToken,

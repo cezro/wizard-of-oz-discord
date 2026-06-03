@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oz Tech - Brand Cover Photo</title>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #121212;
+        color: #ffffff;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      h1 {
+        margin-bottom: 30px;
+        font-weight: 300;
+        letter-spacing: 2px;
+        color: #a0a0a0;
+      }
+
+      /* Canvas styling just for the preview */
+      canvas {
+        border: 1px solid #222;
+        border-radius: 4px;
+        box-shadow: 0 10px 30px rgba(57, 255, 20, 0.15);
+        background-color: #050505; /* Fallback */
+      }
+
+      /* Neon Button Styling */
+      button {
+        margin-top: 40px;
+        padding: 15px 35px;
+        font-size: 16px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #050505;
+        background-color: #39ff14;
+        border: none;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+      }
+
+      button:hover {
+        background-color: #4aff26;
+        box-shadow:
+          0 0 20px rgba(57, 255, 20, 0.8),
+          0 0 40px rgba(57, 255, 20, 0.4);
+        transform: translateY(-2px);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Brand Asset Generator</h1>
+
+    <!-- 680x240 Canvas Element -->
+    <canvas id="coverCanvas" width="680" height="240"></canvas>
+
+    <button id="downloadBtn">Download Cover Photo</button>
+
+    <script>
+      window.onload = function () {
+        const canvas = document.getElementById("coverCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // 1. Draw the background (Dark textured look)
+        ctx.fillStyle = "#0a0a0a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Subtle background grid/texture for a "tech" feel
+        ctx.strokeStyle = "#1a1a1a";
+        ctx.lineWidth = 1;
+        for (let i = 0; i < canvas.width; i += 40) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, canvas.height);
+          ctx.stroke();
+        }
+        for (let j = 0; j < canvas.height; j += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, j);
+          ctx.lineTo(canvas.width, j);
+          ctx.stroke();
+        }
+
+        // 2. Setup Typography
+        const text = "Oz Tech";
+        ctx.font = "italic bold 110px 'Segoe UI', Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        // 3. Function to draw the neon layers
+        // To get a realistic neon glow on a canvas, we draw the text multiple times with varying blur
+        function drawNeonLayer(blur, color, fill) {
+          ctx.shadowBlur = blur;
+          ctx.shadowColor = color;
+          ctx.fillStyle = fill;
+          ctx.fillText(text, centerX, centerY);
+        }
+
+        // Draw intense outer green glow
+        drawNeonLayer(50, "#39ff14", "transparent");
+        drawNeonLayer(30, "#39ff14", "transparent");
+        drawNeonLayer(15, "#39ff14", "transparent");
+
+        // Draw inner text core (very pale green/white so it looks hot)
+        drawNeonLayer(5, "#39ff14", "#e6ffe6");
+
+        // 4. Handle Download
+        document
+          .getElementById("downloadBtn")
+          .addEventListener("click", function () {
+            // Convert canvas to a data URL (PNG)
+            const dataURL = canvas.toDataURL("image/png");
+
+            // Create a temporary link element to trigger the download
+            const link = document.createElement("a");
+            link.download = "Oz_Tech_Cover_680x240.png";
+            link.href = dataURL;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          });
+      };
+    </script>
+  </body>
+</html>
