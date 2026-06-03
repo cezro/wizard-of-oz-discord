@@ -88,7 +88,7 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 | `/standup-config set-reporter-role` | Set which role’s members must post a daily DSM |
 | `/standup-config set-nudge-time` | Set when to remind members who have not posted |
 | `/standup-config clear-nudge-time` | Use the summary time for missing-DSM reminders |
-| `/standup-config set-active-days` | Set which weekdays run automated reminder, nudge, and summary (default Mon–Fri; presets `weekdays`, `weekend`, `all`, or `mon,tue,...`) |
+| `/standup-config set-active-days` | Open an embed with toggle buttons for each weekday; **Save** persists (default Mon–Fri; **Weekdays** / **All** presets) |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year`; unset fields default to today in guild timezone) |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
 | `/standup-debug` | Force-post the daily DSM reminder message (does not update `last_reminder_date`) |

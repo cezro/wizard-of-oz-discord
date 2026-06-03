@@ -1,3 +1,7 @@
+import {
+  handleActiveDaysInteraction,
+  isActiveDaysInteraction,
+} from "../commands/standup-active-days.js";
 import { handleStandupConfigCommand } from "../commands/standup-config.js";
 import {
   handleStandupDownloadInteraction,
@@ -23,6 +27,9 @@ export async function handleInteraction(
   }
 
   if (interaction.type === INTERACTION_MESSAGE_COMPONENT) {
+    if (isActiveDaysInteraction(interaction)) {
+      return handleActiveDaysInteraction(config, interaction);
+    }
     if (isStandupDownloadInteraction(interaction)) {
       return handleStandupDownloadInteraction(config, interaction);
     }

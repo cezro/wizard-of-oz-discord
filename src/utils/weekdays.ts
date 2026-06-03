@@ -3,7 +3,13 @@ import { validateTimezone } from "./timezone.js";
 /** JS Date.getDay() values: 0 = Sunday … 6 = Saturday. */
 export const DEFAULT_ACTIVE_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5];
 
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** Mon–Fri (JS weekdays 1–5). */
+export const WEEKDAY_MASK_WEEKDAYS = (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5);
+
+/** Sun–Sat. */
+export const WEEKDAY_MASK_ALL = 0b1111111;
 
 const DAY_ALIASES: Record<string, number> = {
   sun: 0,
@@ -85,6 +91,26 @@ export function parseActiveWeekdays(
   }
 
   return { ok: true, weekdays: [...days].sort((a, b) => a - b) };
+}
+
+export function weekdaysToBitmask(weekdays: number[]): number {
+  return normalizeActiveWeekdays(weekdays).reduce(
+    (mask, day) => mask | (1 << day),
+    0,
+  );
+}
+
+export function bitmaskToWeekdays(mask: number): number[] {
+  const days: number[] = [];
+  for (let d = 0; d <= 6; d++) {
+    if (mask & (1 << d)) days.push(d);
+  }
+  return days;
+}
+
+export function toggleBitmaskDay(mask: number, day: number): number {
+  if (day < 0 || day > 6 || !Number.isInteger(day)) return mask;
+  return mask ^ (1 << day);
 }
 
 export function formatActiveWeekdays(weekdays: number[]): string {

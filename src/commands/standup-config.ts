@@ -10,11 +10,11 @@ import {
   type InteractionResponse,
 } from "../discord/interaction-utils.js";
 import { requireManageGuild } from "../discord/permissions.js";
+import { handleSetActiveDaysCommand } from "./standup-active-days.js";
 import {
   configRowToTarget,
   getConfig,
   setEnabled,
-  updateActiveWeekdays,
   updateReporterRole,
   updateSchedule,
   upsertConfig,
@@ -27,7 +27,6 @@ import {
 import {
   formatActiveWeekdays,
   normalizeActiveWeekdays,
-  parseActiveWeekdays,
 } from "../utils/weekdays.js";
 
 export type { DiscordInteraction };
@@ -258,20 +257,8 @@ export async function handleStandupConfigCommand(
         );
       }
 
-      case "set-active-days": {
-        const daysOption = getSubcommandOption(interaction, "days");
-        const parsed = parseActiveWeekdays(daysOption);
-        if (!parsed.ok) return ephemeral(parsed.error);
-
-        const row = await updateActiveWeekdays(config, guildId, {
-          activeWeekdays: parsed.weekdays,
-          updatedBy: userId,
-        });
-
-        return ephemeral(
-          `Automated reminders, nudges, and summaries will run on: **${formatActiveWeekdays(normalizeActiveWeekdays(row.active_weekdays))}** (\`${row.timezone}\`).`,
-        );
-      }
+      case "set-active-days":
+        return handleSetActiveDaysCommand(config, interaction);
 
       default:
         return ephemeral("Unknown subcommand.");

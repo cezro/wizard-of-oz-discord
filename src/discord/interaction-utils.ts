@@ -40,6 +40,35 @@ export function ephemeral(content: string): InteractionResponse {
   };
 }
 
+export interface InteractionMessageData {
+  content?: string;
+  embeds?: Record<string, unknown>[];
+  components?: unknown[];
+}
+
+export function getInteractionCustomId(
+  interaction: DiscordInteraction,
+): string | undefined {
+  return interaction.data?.custom_id;
+}
+
+export function ephemeralMessageWithComponents(
+  data: InteractionMessageData,
+): InteractionResponse {
+  return {
+    type: RESPONSE_MESSAGE,
+    data: { ...data, flags: EPHEMERAL },
+  };
+}
+
+/** Updates the message that contained the clicked component (ephemeral-safe). */
+export function updateMessage(data: InteractionMessageData): InteractionResponse {
+  return {
+    type: 7,
+    data,
+  };
+}
+
 /** Acknowledge immediately; follow up via interaction webhook (15 min window). */
 export function deferredEphemeral(): InteractionResponse {
   return {

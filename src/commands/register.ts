@@ -133,16 +133,7 @@ const STANDUP_CONFIG_COMMAND = {
       type: 1,
       name: "set-active-days",
       description:
-        "Set which days run reminders and summaries (default Mon–Fri if omitted)",
-      options: [
-        {
-          type: 3,
-          name: "days",
-          description:
-            "e.g. weekdays, mon,tue,wed,thu,fri, weekend, all — omit for Mon–Fri",
-          required: false,
-        },
-      ],
+        "Choose which days run reminders and summaries (interactive toggles)",
     },
   ],
 };

@@ -45,6 +45,7 @@ src/
   commands/register.ts        # slash command registration
   commands/standup.ts         # summarize + remind-missing handlers
   commands/standup-config.ts  # channel, schedule, and role config handlers
+  commands/standup-active-days.ts  # active-weekday embed + toggle buttons
   cron/standup-tick.ts        # reminder, nudge, summary tick
   standup/reminder.ts         # daily DSM reminder + reporter pings
   standup/missing-reporters.ts
