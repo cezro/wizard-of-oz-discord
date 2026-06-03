@@ -2,6 +2,12 @@ export interface StandupTarget {
   guildId: string;
   channelId: string;
   timezone: string;
+  reminderHour: number | null;
+  reminderMinute: number;
+  summaryHour: number;
+  summaryMinute: number;
+  lastReminderDate: string | null;
+  lastSummaryDate: string | null;
 }
 
 export interface SanitizedMessage {

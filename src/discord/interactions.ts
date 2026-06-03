@@ -1,6 +1,7 @@
 import { handleStandupConfigCommand } from "../commands/standup-config.js";
+import { handleStandupDebugCommand } from "../commands/standup-debug.js";
 import type { AppConfig } from "../config.js";
-import type { DiscordInteraction } from "../commands/standup-config.js";
+import type { DiscordInteraction } from "../discord/interaction-utils.js";
 
 const INTERACTION_PING = 1;
 const INTERACTION_APPLICATION_COMMAND = 2;
@@ -19,6 +20,9 @@ export async function handleInteraction(
     const commandName = interaction.data?.name;
     if (commandName === "standup-config") {
       return handleStandupConfigCommand(config, interaction);
+    }
+    if (commandName === "standup-debug") {
+      return handleStandupDebugCommand(config, interaction);
     }
     return {
       type: 4,

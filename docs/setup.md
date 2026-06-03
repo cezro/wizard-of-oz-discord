@@ -12,9 +12,12 @@ The primary objective is to eliminate manual oversight and provide an automated,
 
 ### A. Scheduling & Triggering (Ingress)
 
-- **Cadence:** Automatically execute once per day, Monday through Friday, at end-of-day (Target: 5:00 PM / 17:00 Philippine Standard Time (PST) / UTC+8).
-- **Security:** If deployed as an HTTP endpoint (e.g., Vercel Serverless, Cloudflare Workers, Firebase Functions), the route must require a secure authorization token passed via headers (e.g., `Authorization: Bearer <CRON_SECRET>`) to prevent webhook spam.
-- **Timezone Safety:** Per-guild IANA timezone (default `Asia/Manila`) is validated at pipeline start and used for embed date formatting. The fetch window is anchored to cron execution time, not server-local clock.
+- **Cadence:** A Render cron job hits `POST /cron/standup` **every minute, Monday through Friday**. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). The tick fires at most once per guild per calendar day for each action.
+- **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM.
+- **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
+- **Security:** The cron route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.
+- **Timezone Safety:** Per-guild IANA timezone (default `Asia/Manila`) is validated at pipeline start and used for schedule matching and embed date formatting. The fetch window is anchored to execution time, not server-local clock.
+- **Manual trigger:** `/standup-debug summarize` (Manage Server only) force-runs the summary pipeline immediately for the current server.
 
 ### B. Message Ingestion & Sanitization
 
@@ -66,7 +69,21 @@ The primary objective is to eliminate manual oversight and provide an automated,
 
 ## 5. Required Environment Variables (`.env`)
 
-See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the current list. Per-server channel and timezone are configured via `/standup-config set` in Discord (stored in Supabase), not in env vars.
+See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the current list. Per-server channel, timezone, and schedule are configured via Discord slash commands (stored in Supabase), not in env vars.
+
+### Slash commands (Manage Server required)
+
+| Command | Purpose |
+| :------ | :------ |
+| `/standup-config set` | Set DSM channel and optional timezone |
+| `/standup-config show` | Show channel, timezone, enabled state |
+| `/standup-config enable` / `disable` | Toggle automated reminders and summaries |
+| `/standup-debug set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
+| `/standup-debug set-summary-time` | Set daily summary hour/minute (default 17:00) |
+| `/standup-debug show-schedule` | Show reminder/summary times and last run dates |
+| `/standup-debug summarize` | Force-run the summary pipeline now |
+
+Run `supabase/migrations/001_standup_config.sql` and `002_standup_schedule.sql` in Supabase before using schedule commands.
 
 ```env
 DISCORD_BOT_TOKEN=your_discord_bot_token

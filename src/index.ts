@@ -8,7 +8,7 @@ import { loadConfig } from "./config.js";
 import { startDiscordGateway } from "./discord/gateway.js";
 import { verifyDiscordRequest } from "./discord/verify.js";
 import { handleInteraction } from "./discord/interactions.js";
-import { runAllPipelines } from "./pipeline.js";
+import { runStandupTick } from "./cron/standup-tick.js";
 
 const config = loadConfig();
 const stopGateway = startDiscordGateway(config.discordBotToken);
@@ -36,7 +36,7 @@ app.post("/cron/standup", async (c) => {
   }
 
   try {
-    const result = await runAllPipelines(config);
+    const result = await runStandupTick(config);
     return c.json({ ok: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

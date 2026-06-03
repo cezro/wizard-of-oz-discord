@@ -7,12 +7,23 @@ const EMBED_COLOR = 0x5865f2;
 const EMBED_DESCRIPTION_LIMIT = 4096;
 const EMPTY_DAY_MESSAGE =
   "No standup updates recorded for today! Hope everyone had a productive day.";
+const REMINDER_MESSAGE =
+  "**Daily Standup Reminder** — Please post your async DSM update in this channel.";
 
 interface DiscordEmbed {
   title: string;
   description?: string;
   color: number;
   footer?: { text: string };
+}
+
+export async function broadcastReminder(
+  config: AppConfig,
+  channelId: string,
+): Promise<void> {
+  await postChannelMessage(config, channelId, {
+    content: REMINDER_MESSAGE,
+  });
 }
 
 export async function broadcastResult(

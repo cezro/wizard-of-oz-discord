@@ -3,6 +3,24 @@ import { DiscordApiError, discordJson } from "../utils/discord-api.js";
 
 const MANAGE_GUILD_PERMISSION = "32";
 
+const HOUR_OPTION = {
+  type: 4,
+  name: "hour",
+  description: "Hour in guild timezone (0–23)",
+  required: true,
+  min_value: 0,
+  max_value: 23,
+};
+
+const MINUTE_OPTION = {
+  type: 4,
+  name: "minute",
+  description: "Minute (0–59, default 0)",
+  required: false,
+  min_value: 0,
+  max_value: 59,
+};
+
 const STANDUP_CONFIG_COMMAND = {
   name: "standup-config",
   description: "Configure the daily standup summarizer bot",
@@ -45,8 +63,38 @@ const STANDUP_CONFIG_COMMAND = {
   ],
 };
 
+const STANDUP_DEBUG_COMMAND = {
+  name: "standup-debug",
+  description: "Debug and manual controls for the standup bot",
+  default_member_permissions: MANAGE_GUILD_PERMISSION,
+  options: [
+    {
+      type: 1,
+      name: "set-reminder-time",
+      description: "Set when the bot reminds everyone to post their DSM",
+      options: [HOUR_OPTION, MINUTE_OPTION],
+    },
+    {
+      type: 1,
+      name: "set-summary-time",
+      description: "Set when the daily summary runs",
+      options: [HOUR_OPTION, MINUTE_OPTION],
+    },
+    {
+      type: 1,
+      name: "show-schedule",
+      description: "Show reminder and summary schedule for this server",
+    },
+    {
+      type: 1,
+      name: "summarize",
+      description: "Force-run the summary pipeline now for this server",
+    },
+  ],
+};
+
 export async function registerSlashCommands(config: AppConfig): Promise<void> {
-  const commands = [STANDUP_CONFIG_COMMAND];
+  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_DEBUG_COMMAND];
 
   try {
     await discordJson(

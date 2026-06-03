@@ -10,6 +10,12 @@ export interface StandupConfigRow {
   enabled: boolean;
   updated_at: string;
   updated_by: string | null;
+  reminder_hour: number | null;
+  reminder_minute: number;
+  summary_hour: number;
+  summary_minute: number;
+  last_reminder_date: string | null;
+  last_summary_date: string | null;
 }
 
 let client: SupabaseClient | null = null;

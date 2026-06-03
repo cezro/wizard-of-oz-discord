@@ -1,66 +1,33 @@
 import type { AppConfig } from "../config.js";
 import {
+  ephemeral,
+  getSubcommand,
+  getSubcommandOption,
+  getUserId,
+  requireGuild,
+  type DiscordInteraction,
+  type InteractionResponse,
+} from "../discord/interaction-utils.js";
+import { requireManageGuild } from "../discord/permissions.js";
+import {
   getConfig,
   setEnabled,
   upsertConfig,
 } from "../storage/config-store.js";
 
-const EPHEMERAL = 64;
-const RESPONSE_MESSAGE = 4;
-
-interface InteractionOption {
-  type: number;
-  name: string;
-  value?: string | number;
-  options?: InteractionOption[];
-}
-
-export interface DiscordInteraction {
-  type: number;
-  data?: {
-    name: string;
-    options?: InteractionOption[];
-  };
-  guild_id?: string;
-  member?: { user: { id: string } };
-  user?: { id: string };
-}
-
-type InteractionResponse = Record<string, unknown>;
-
-function ephemeral(content: string): InteractionResponse {
-  return {
-    type: RESPONSE_MESSAGE,
-    data: { content, flags: EPHEMERAL },
-  };
-}
-
-function getUserId(interaction: DiscordInteraction): string {
-  return interaction.member?.user.id ?? interaction.user?.id ?? "unknown";
-}
-
-function getSubcommand(interaction: DiscordInteraction): string | undefined {
-  return interaction.data?.options?.[0]?.name;
-}
-
-function getSubcommandOption(
-  interaction: DiscordInteraction,
-  optionName: string,
-): string | undefined {
-  const sub = interaction.data?.options?.[0];
-  const opt = sub?.options?.find((o) => o.name === optionName);
-  if (opt?.value === undefined) return undefined;
-  return String(opt.value);
-}
+export type { DiscordInteraction };
 
 export async function handleStandupConfigCommand(
   config: AppConfig,
   interaction: DiscordInteraction,
 ): Promise<InteractionResponse> {
-  const guildId = interaction.guild_id;
-  if (!guildId) {
-    return ephemeral("This command can only be used in a server.");
+  if (!requireManageGuild(interaction)) {
+    return ephemeral("You need **Manage Server** permission to use this command.");
   }
+
+  const guildResult = requireGuild(interaction);
+  if (!guildResult.ok) return guildResult.response;
+  const { guildId } = guildResult;
 
   const userId = getUserId(interaction);
   const subcommand = getSubcommand(interaction);
