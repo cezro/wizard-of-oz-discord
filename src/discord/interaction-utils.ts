@@ -7,6 +7,17 @@ interface InteractionOption {
   options?: InteractionOption[];
 }
 
+interface ModalTextInputComponent {
+  type: number;
+  custom_id: string;
+  value?: string;
+}
+
+interface ModalActionRow {
+  type: number;
+  components: ModalTextInputComponent[];
+}
+
 export interface DiscordInteraction {
   type: number;
   token?: string;
@@ -16,7 +27,9 @@ export interface DiscordInteraction {
     name?: string;
     custom_id?: string;
     component_type?: number;
+    values?: string[];
     options?: InteractionOption[];
+    components?: ModalActionRow[];
   };
   message?: MessageWithComponents & { id: string };
   guild_id?: string;
@@ -67,6 +80,31 @@ export function updateMessage(data: InteractionMessageData): InteractionResponse
     type: 7,
     data,
   };
+}
+
+export function openModal(modal: Record<string, unknown>): InteractionResponse {
+  return {
+    type: 9,
+    data: modal,
+  };
+}
+
+export function getSelectValues(interaction: DiscordInteraction): string[] {
+  return interaction.data?.values ?? [];
+}
+
+export function getModalTextValue(
+  interaction: DiscordInteraction,
+  fieldCustomId: string,
+): string | undefined {
+  for (const row of interaction.data?.components ?? []) {
+    for (const component of row.components) {
+      if (component.custom_id === fieldCustomId) {
+        return component.value;
+      }
+    }
+  }
+  return undefined;
 }
 
 /** Acknowledge immediately; follow up via interaction webhook (15 min window). */

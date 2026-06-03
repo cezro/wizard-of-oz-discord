@@ -73,7 +73,7 @@ export function loadConfig(): AppConfig {
 }
 
 const NO_CONFIG_MESSAGE =
-  "No standup channel configured. Run /standup-config set in your Discord server.";
+  "No standup channel configured. Run /standup-config in your Discord server.";
 
 export async function resolveStandupTargets(
   config: AppConfig,

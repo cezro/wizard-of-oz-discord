@@ -12,11 +12,12 @@ The primary objective is to eliminate manual oversight and provide an automated,
 
 ### A. Scheduling & Triggering (Ingress)
 
-- **Cadence:** A Render cron job hits `POST /cron/standup` **every minute**. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). Automated reminder, missing-DSM nudge, and summary actions run only on **active weekdays** for that guild (default **Mon–Fri** in the guild timezone; configure with `/standup-config set-active-days`). The tick fires at most once per guild per calendar day for each action.
-- **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM. When a reporter role is configured (`/standup-config set-reporter-role`), the reminder @-mentions every non-bot member with that role (same `allowed_mentions` pattern as the missing DSM nudge; requires **Server Members Intent**). If no reporter role is set, the reminder is text-only.
+- **Cadence:** An in-process scheduler runs `runStandupTick` **every minute** while the app is running (`STANDUP_INTERNAL_SCHEDULER` defaults to on). The Discord Gateway WebSocket keeps the Node process warm on Render free tier. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). Automated reminder, missing-DSM nudge, and summary actions run only on **active weekdays** for that guild (default **Mon–Fri**; configure in `/standup-config` → **Active days**). The tick fires at most once per guild per calendar day for each action.
+- **Optional HTTP trigger:** `POST /cron/standup` with `Authorization: Bearer <CRON_SECRET>` runs the same tick (for debugging or if `STANDUP_INTERNAL_SCHEDULER=false` and you use an external pinger). A separate Render Cron Job is not required.
+- **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM. When a reporter role is configured (via `/standup-config` → **Reporter role**), the reminder @-mentions every non-bot member with that role (same `allowed_mentions` pattern as the missing DSM nudge; requires **Server Members Intent**). If no reporter role is set, the reminder is text-only.
 - **Missing DSM nudge:** At the configured nudge time (defaults to summary time if not set), the bot mentions members who have the configured reporter role but have not posted a **valid** DSM check-in in the standup channel within the rolling 24-hour window. Requires **Server Members Intent** in the Discord Developer Portal.
 - **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
-- **Security:** The cron route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.
+- **Security:** The optional `POST /cron/standup` route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.
 - **Timezone Safety:** Per-guild IANA timezone (default `Asia/Manila`) is validated at pipeline start and used for schedule matching and embed date formatting. The fetch window is anchored to execution time, not server-local clock.
 - **Manual trigger:** `/standup summarize` (Manage Server only) force-runs the summary pipeline for the current server. Optional `month`, `day`, and `year` (integers) select which calendar day to ingest in the guild timezone; any field omitted defaults to today’s value for that field. Invalid combinations (e.g. February 31) are rejected with an error. Manual runs use a full calendar-day window (local midnight through end of day), not the cron rolling 24-hour window.
 
@@ -79,16 +80,7 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 
 | Command | Purpose |
 | :------ | :------ |
-| `/standup-config set` | Set DSM channel and optional timezone |
-| `/standup-config show` | Show channel, timezone, enabled state |
-| `/standup-config enable` / `disable` | Toggle automated reminders and summaries |
-| `/standup-config set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
-| `/standup-config set-summary-time` | Set daily summary hour/minute (default 17:00) |
-| `/standup-config show-schedule` | Show reminder/summary times and last run dates |
-| `/standup-config set-reporter-role` | Set which role’s members must post a daily DSM |
-| `/standup-config set-nudge-time` | Set when to remind members who have not posted |
-| `/standup-config clear-nudge-time` | Use the summary time for missing-DSM reminders |
-| `/standup-config set-active-days` | Open an embed with toggle buttons for each weekday; **Save** persists (default Mon–Fri; **Weekdays** / **All** presets) |
+| `/standup-config` | Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year`; unset fields default to today in guild timezone) |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
 | `/standup-debug` | Force-post the daily DSM reminder message (does not update `last_reminder_date`) |
@@ -113,4 +105,5 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=your_supabase_secret_key
 GEMINI_API_KEY=your_google_gemini_api_key
 CRON_SECRET=your_secure_cron_secret
+STANDUP_INTERNAL_SCHEDULER=true
 ```

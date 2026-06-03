@@ -8,12 +8,26 @@ import { loadConfig } from "./config.js";
 import { startDiscordGateway } from "./discord/gateway.js";
 import { verifyDiscordRequest } from "./discord/verify.js";
 import { handleInteraction } from "./discord/interactions.js";
+import {
+  isInternalSchedulerEnabled,
+  startInternalScheduler,
+} from "./cron/internal-scheduler.js";
 import { runStandupTick } from "./cron/standup-tick.js";
 
 const config = loadConfig();
 const stopGateway = startDiscordGateway(config.discordBotToken);
+const stopScheduler = isInternalSchedulerEnabled()
+  ? startInternalScheduler(config)
+  : null;
+
+if (!stopScheduler) {
+  console.log(
+    "[scheduler] internal standup tick disabled (STANDUP_INTERNAL_SCHEDULER=false); use POST /cron/standup or manual commands",
+  );
+}
 
 function shutdown(): void {
+  stopScheduler?.();
   stopGateway();
 }
 

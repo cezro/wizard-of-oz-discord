@@ -10,7 +10,8 @@ Source of truth: [docs/setup.md](../docs/setup.md).
 
 | Layer | Path | Responsibility |
 |-------|------|----------------|
-| Ingress | `src/index.ts` | `/health`, `/cron/standup`, `/discord/interactions` |
+| Ingress | `src/index.ts` | `/health`, `/cron/standup`, `/discord/interactions`, internal scheduler |
+| Scheduler | `src/cron/internal-scheduler.ts` | Minute tick for reminders/nudges/summaries |
 | Config store | `src/storage/config-store.ts` | Supabase CRUD for `standup_config` |
 | Commands | `src/commands/standup-config.ts` | Slash command handlers |
 | Ingestion | `src/ingestion/discord.ts` | Paginated fetch, sanitize, sort |
@@ -36,7 +37,8 @@ Use raw `fetch` for Discord REST (no `discord.js`).
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_SECRET_KEY` | Yes | Server-only (`sb_secret_...`; legacy `SUPABASE_SERVICE_ROLE_KEY` still accepted) |
 | `GEMINI_API_KEY` | Yes | Google GenAI |
-| `CRON_SECRET` | Yes | Bearer auth on `/cron/standup` |
+| `CRON_SECRET` | Yes | Bearer auth on optional `POST /cron/standup` |
+| `STANDUP_INTERNAL_SCHEDULER` | No | Default on; in-process minute tick |
 | `PORT` | No | Default `3000` |
 | `GEMINI_MODEL` | No | Default `gemini-3.1-flash-lite` |
 
@@ -65,8 +67,8 @@ Requires **Manage Server** permission.
 1. Run Supabase migration; set `SUPABASE_*` and Discord env vars on the web service.
 2. Deploy; confirm `/health` returns OK.
 3. Set Interactions Endpoint URL in Discord to your Render URL.
-4. Cron: `0 9 * * 1-5` UTC → `POST /cron/standup` with `Authorization: Bearer <CRON_SECRET>`.
-5. Run `/standup-config set` in each server before that server's first cron run.
+4. Ensure `STANDUP_INTERNAL_SCHEDULER` is on (default) so reminders/nudges/summaries run in-process every minute. No Render Cron Job required.
+5. Run `/standup-config set` in each server before that server's first scheduled summary.
 
 ## Environment setup
 

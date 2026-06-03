@@ -111,7 +111,7 @@ export async function setEnabled(
   const existing = await getConfig(config, guildId);
   if (!existing) {
     throw new Error(
-      "No configuration found for this server. Run /standup-config set first.",
+      "No configuration found for this server. Run /standup-config first.",
     );
   }
 
@@ -139,7 +139,7 @@ export async function updateSchedule(
   const existing = await getConfig(config, guildId);
   if (!existing) {
     throw new Error(
-      "No configuration found for this server. Run /standup-config set first.",
+      "No configuration found for this server. Run /standup-config first.",
     );
   }
 
@@ -211,7 +211,7 @@ export async function updateActiveWeekdays(
   const existing = await getConfig(config, guildId);
   if (!existing) {
     throw new Error(
-      "No configuration found for this server. Run /standup-config set first.",
+      "No configuration found for this server. Run /standup-config first.",
     );
   }
 
@@ -233,6 +233,43 @@ export async function updateActiveWeekdays(
   return data;
 }
 
+export interface PatchConfigInput {
+  channelId?: string;
+  timezone?: string;
+  updatedBy: string;
+}
+
+export async function patchConfig(
+  config: AppConfig,
+  guildId: string,
+  input: PatchConfigInput,
+): Promise<StandupConfigRow> {
+  const existing = await getConfig(config, guildId);
+  if (!existing) {
+    throw new Error(
+      "No configuration found for this server. Use /standup-config to set up first.",
+    );
+  }
+
+  const patch: Record<string, unknown> = {
+    updated_by: input.updatedBy,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.channelId !== undefined) patch.channel_id = input.channelId;
+  if (input.timezone !== undefined) patch.timezone = input.timezone;
+
+  const supabase = getSupabase(config);
+  const { data, error } = await supabase
+    .from("standup_config")
+    .update(patch)
+    .eq("guild_id", guildId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update config: ${error.message}`);
+  return data;
+}
+
 export async function updateReporterRole(
   config: AppConfig,
   guildId: string,
@@ -241,7 +278,7 @@ export async function updateReporterRole(
   const existing = await getConfig(config, guildId);
   if (!existing) {
     throw new Error(
-      "No configuration found for this server. Run /standup-config set first.",
+      "No configuration found for this server. Run /standup-config first.",
     );
   }
 

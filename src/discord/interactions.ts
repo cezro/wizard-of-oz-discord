@@ -1,8 +1,8 @@
 import {
-  handleActiveDaysInteraction,
-  isActiveDaysInteraction,
-} from "../commands/standup-active-days.js";
-import { handleStandupConfigCommand } from "../commands/standup-config.js";
+  handleConfigUiInteraction,
+  handleStandupConfigCommand,
+  isConfigUiInteraction,
+} from "../commands/standup-config.js";
 import {
   handleStandupDownloadInteraction,
   isStandupDownloadInteraction,
@@ -15,6 +15,7 @@ import type { DiscordInteraction } from "../discord/interaction-utils.js";
 const INTERACTION_PING = 1;
 const INTERACTION_APPLICATION_COMMAND = 2;
 const INTERACTION_MESSAGE_COMPONENT = 3;
+const INTERACTION_MODAL_SUBMIT = 5;
 
 const RESPONSE_PONG = 1;
 
@@ -26,9 +27,19 @@ export async function handleInteraction(
     return { type: RESPONSE_PONG };
   }
 
+  if (interaction.type === INTERACTION_MODAL_SUBMIT) {
+    if (isConfigUiInteraction(interaction)) {
+      return handleConfigUiInteraction(config, interaction);
+    }
+    return {
+      type: 4,
+      data: { content: "Unsupported modal.", flags: 64 },
+    };
+  }
+
   if (interaction.type === INTERACTION_MESSAGE_COMPONENT) {
-    if (isActiveDaysInteraction(interaction)) {
-      return handleActiveDaysInteraction(config, interaction);
+    if (isConfigUiInteraction(interaction)) {
+      return handleConfigUiInteraction(config, interaction);
     }
     if (isStandupDownloadInteraction(interaction)) {
       return handleStandupDownloadInteraction(config, interaction);

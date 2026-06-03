@@ -100,7 +100,7 @@ Using only `applications.commands` (without `bot`) can show the app under **Serv
 
 ### `CRON_SECRET`
 
-**What it is:** A password you invent. Render’s cron job sends it as `Authorization: Bearer <CRON_SECRET>` when calling `/cron/standup`.
+**What it is:** A password you invent. It secures optional manual or external calls to `POST /cron/standup` (`Authorization: Bearer <CRON_SECRET>`).
 
 **Where to get it:** You generate it yourself.
 
@@ -113,11 +113,15 @@ Using only `applications.commands` (without `bot`) can show the app under **Serv
 
 Or use any password manager / long random string (32+ characters).
 
-**Use the same value** in:
+**Use the same value** in local `.env` and Render web service env.
 
-- Local `.env`
-- Render web service env
-- Render cron job `Authorization` header
+---
+
+### `STANDUP_INTERNAL_SCHEDULER`
+
+**What it is:** When `true` (default), the app runs reminder, nudge, and summary ticks every minute in-process. No separate Render Cron Job is needed.
+
+**Where to get it:** Set in `.env` or leave unset (defaults to on). Set `false` only if you will trigger `POST /cron/standup` from an external scheduler instead.
 
 ---
 
@@ -150,13 +154,13 @@ The bot works in **any server** you invite it to. No server or channel IDs go in
 1. Invite the bot to each server (OAuth2 URL with `bot` + `applications.commands`).
 2. Slash commands register **globally** when the app starts (may take up to ~1 hour the first time).
 3. In **each** server, run `/standup-config set` to choose the standup channel and timezone (stored in Supabase).
-4. Cron (`POST /cron/standup`) runs the pipeline for **every enabled** server in the database.
+4. The in-process scheduler runs reminders, nudges, and summaries for **every enabled** server in the database (per-guild times in Supabase).
 
 ---
 
 ## Bot not in member list?
 
-This project is an **HTTP-only** bot (REST + Interactions). It does not connect to Discord’s Gateway, so the bot will appear **offline (gray)** when it is a member—not green/online. That is normal and does not break standups or slash commands.
+The bot uses HTTP for slash commands and a lightweight **Gateway** connection (for Server Members Intent). It may appear **offline (gray)** in the member list even when healthy; that does not break standups or slash commands.
 
 If the bot does not appear in the member list **at all** (even after searching), the bot user was likely never added to the guild.
 
@@ -215,8 +219,8 @@ curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
 |------|-------|
 | Health | `https://standup-summarizer.onrender.com/health` |
 | Interactions Endpoint URL | `https://standup-summarizer.onrender.com/discord/interactions` |
-| Cron | `POST https://standup-summarizer.onrender.com/cron/standup` with `Authorization: Bearer <CRON_SECRET>` |
-| Cron schedule | `0 9 * * 1-5` UTC (= 17:00 Asia/Manila, Mon–Fri) |
+| Scheduled standups | In-process tick every minute (`STANDUP_INTERNAL_SCHEDULER=true`, default) |
+| Debug tick (optional) | `POST https://standup-summarizer.onrender.com/cron/standup` with `Authorization: Bearer <CRON_SECRET>` |
 
 **Developer Portal — set Interactions Endpoint URL now** (General Information → paste URL above → Save Changes). Discord sends a signed PING; Render must be awake (hit `/health` first on free tier). Until this is saved, `/standup-config` will not respond in Discord.
 

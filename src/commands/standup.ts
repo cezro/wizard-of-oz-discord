@@ -121,13 +121,13 @@ export async function handleStandupCommand(
         const row = await getConfig(config, guildId);
         if (!row) {
           return ephemeral(
-            "No configuration yet. Run `/standup-config set` first.",
+            "No configuration yet. Run `/standup-config` first.",
           );
         }
 
         if (!row.reporter_role_id) {
           return ephemeral(
-            "No reporter role configured. Run `/standup-config set-reporter-role` first.",
+            "No reporter role configured. Set one in `/standup-config` → Reporter role.",
           );
         }
 
@@ -154,7 +154,7 @@ export async function handleStandupCommand(
         const row = await getConfig(config, guildId);
         if (!row) {
           return ephemeral(
-            "No configuration yet. Run `/standup-config set` first.",
+            "No configuration yet. Run `/standup-config` first.",
           );
         }
 

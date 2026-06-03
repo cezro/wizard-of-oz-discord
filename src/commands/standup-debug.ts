@@ -26,7 +26,7 @@ export async function handleStandupDebugCommand(
     const row = await getConfig(config, guildId);
     if (!row) {
       return ephemeral(
-        "No configuration yet. Run `/standup-config set` first.",
+        "No configuration yet. Run `/standup-config` first.",
       );
     }
 
