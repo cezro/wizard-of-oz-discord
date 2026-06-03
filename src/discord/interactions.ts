@@ -1,10 +1,15 @@
 import { handleStandupConfigCommand } from "../commands/standup-config.js";
+import {
+  handleStandupDownloadInteraction,
+  isStandupDownloadInteraction,
+} from "../commands/standup-download.js";
 import { handleStandupCommand } from "../commands/standup.js";
 import type { AppConfig } from "../config.js";
 import type { DiscordInteraction } from "../discord/interaction-utils.js";
 
 const INTERACTION_PING = 1;
 const INTERACTION_APPLICATION_COMMAND = 2;
+const INTERACTION_MESSAGE_COMPONENT = 3;
 
 const RESPONSE_PONG = 1;
 
@@ -14,6 +19,16 @@ export async function handleInteraction(
 ): Promise<Record<string, unknown>> {
   if (interaction.type === INTERACTION_PING) {
     return { type: RESPONSE_PONG };
+  }
+
+  if (interaction.type === INTERACTION_MESSAGE_COMPONENT) {
+    if (isStandupDownloadInteraction(interaction)) {
+      return handleStandupDownloadInteraction(config, interaction);
+    }
+    return {
+      type: 4,
+      data: { content: "Unsupported button.", flags: 64 },
+    };
   }
 
   if (interaction.type === INTERACTION_APPLICATION_COMMAND) {

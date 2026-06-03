@@ -22,7 +22,9 @@ const COMPONENT_TYPE_ACTION_ROW = 1;
 const COMPONENT_TYPE_BUTTON = 2;
 const COMPONENT_TYPE_TEXT_DISPLAY = 10;
 const COMPONENT_TYPE_CONTAINER = 17;
+const BUTTON_STYLE_PRIMARY = 1;
 const BUTTON_STYLE_LINK = 5;
+export const STANDUP_DOWNLOAD_CUSTOM_ID = "standup:md_download";
 
 interface DiscordEmbed {
   title: string;
@@ -56,11 +58,13 @@ interface DiscordMessageComponent {
   style?: number;
   label?: string;
   url?: string;
+  custom_id?: string;
 }
 
 interface ComponentsV2MessageBody {
   flags: number;
   components: DiscordMessageComponent[];
+  attachments?: { id: number; filename: string }[];
   allowed_mentions?: AllowedMentions;
 }
 
@@ -183,12 +187,16 @@ export async function broadcastResult(
 
   const initialBody: ComponentsV2MessageBody = {
     flags: IS_COMPONENTS_V2,
+    attachments: [{ id: 0, filename }],
     components: [
       {
         type: COMPONENT_TYPE_CONTAINER,
         accent_color: EMBED_COLOR,
         components: containerChildren,
       },
+      buildDownloadActionRow(BUTTON_STYLE_PRIMARY, {
+        custom_id: STANDUP_DOWNLOAD_CUSTOM_ID,
+      }),
     ],
   };
 
@@ -200,9 +208,9 @@ export async function broadcastResult(
   );
 
   const attachment = created.attachments[0];
-  if (!attachment) {
+  if (!attachment?.url) {
     console.error(
-      "[egress/discord] Summary posted without attachment; skipping download button",
+      "[egress/discord] Summary posted without attachment URL; download button may not work",
     );
     return "summary";
   }
@@ -214,32 +222,39 @@ export async function broadcastResult(
         {
           type: COMPONENT_TYPE_CONTAINER,
           accent_color: EMBED_COLOR,
-          components: [
-            ...containerChildren,
-            {
-              type: COMPONENT_TYPE_ACTION_ROW,
-              components: [
-                {
-                  type: COMPONENT_TYPE_BUTTON,
-                  style: BUTTON_STYLE_LINK,
-                  label: "Download Markdown",
-                  url: attachment.url,
-                },
-              ],
-            },
-          ],
+          components: containerChildren,
         },
+        buildDownloadActionRow(BUTTON_STYLE_LINK, {
+          url: attachment.url,
+        }),
       ],
       attachments: [{ id: attachment.id, filename: attachment.filename }],
     });
   } catch (error) {
     console.error(
-      "[egress/discord] Failed to add download button to summary message:",
+      "[egress/discord] Failed to upgrade download button to link; interaction fallback remains:",
       error,
     );
   }
 
   return "summary";
+}
+
+function buildDownloadActionRow(
+  style: number,
+  button: { url: string } | { custom_id: string },
+): DiscordMessageComponent {
+  return {
+    type: COMPONENT_TYPE_ACTION_ROW,
+    components: [
+      {
+        type: COMPONENT_TYPE_BUTTON,
+        style,
+        label: "Download Markdown",
+        ...button,
+      },
+    ],
+  };
 }
 
 function truncateSummaryText(markdown: string): {

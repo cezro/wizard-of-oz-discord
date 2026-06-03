@@ -9,9 +9,16 @@ export interface DiscordInteraction {
   type: number;
   token?: string;
   application_id?: string;
+  channel_id?: string;
   data?: {
-    name: string;
+    name?: string;
+    custom_id?: string;
+    component_type?: number;
     options?: InteractionOption[];
+  };
+  message?: {
+    id: string;
+    attachments?: { id: string; url: string; filename: string }[];
   };
   guild_id?: string;
   member?: {
