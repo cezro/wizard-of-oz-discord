@@ -32,7 +32,7 @@ function validateHourMinute(
   return null;
 }
 
-export async function handleStandupDebugCommand(
+export async function handleStandupCommand(
   config: AppConfig,
   interaction: DiscordInteraction,
 ): Promise<InteractionResponse> {

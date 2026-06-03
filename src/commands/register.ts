@@ -63,9 +63,9 @@ const STANDUP_CONFIG_COMMAND = {
   ],
 };
 
-const STANDUP_DEBUG_COMMAND = {
-  name: "standup-debug",
-  description: "Debug and manual controls for the standup bot",
+const STANDUP_COMMAND = {
+  name: "standup",
+  description: "Schedule and manual controls for the standup bot",
   default_member_permissions: MANAGE_GUILD_PERMISSION,
   options: [
     {
@@ -94,7 +94,7 @@ const STANDUP_DEBUG_COMMAND = {
 };
 
 export async function registerSlashCommands(config: AppConfig): Promise<void> {
-  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_DEBUG_COMMAND];
+  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_COMMAND];
 
   try {
     await discordJson(

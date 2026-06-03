@@ -17,7 +17,7 @@ The primary objective is to eliminate manual oversight and provide an automated,
 - **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
 - **Security:** The cron route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.
 - **Timezone Safety:** Per-guild IANA timezone (default `Asia/Manila`) is validated at pipeline start and used for schedule matching and embed date formatting. The fetch window is anchored to execution time, not server-local clock.
-- **Manual trigger:** `/standup-debug summarize` (Manage Server only) force-runs the summary pipeline immediately for the current server.
+- **Manual trigger:** `/standup summarize` (Manage Server only) force-runs the summary pipeline immediately for the current server.
 
 ### B. Message Ingestion & Sanitization
 
@@ -78,10 +78,10 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 | `/standup-config set` | Set DSM channel and optional timezone |
 | `/standup-config show` | Show channel, timezone, enabled state |
 | `/standup-config enable` / `disable` | Toggle automated reminders and summaries |
-| `/standup-debug set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
-| `/standup-debug set-summary-time` | Set daily summary hour/minute (default 17:00) |
-| `/standup-debug show-schedule` | Show reminder/summary times and last run dates |
-| `/standup-debug summarize` | Force-run the summary pipeline now |
+| `/standup set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
+| `/standup set-summary-time` | Set daily summary hour/minute (default 17:00) |
+| `/standup show-schedule` | Show reminder/summary times and last run dates |
+| `/standup summarize` | Force-run the summary pipeline now |
 
 Run `supabase/migrations/001_standup_config.sql` and `002_standup_schedule.sql` in Supabase before using schedule commands.
 
