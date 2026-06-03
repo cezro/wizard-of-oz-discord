@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; fetch window = last 24 hours.
+1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion.
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts.
 4. **Order:** Oldest → newest before Gemini.

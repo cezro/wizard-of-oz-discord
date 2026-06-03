@@ -3,12 +3,25 @@ export interface StandupWindow {
   windowEnd: Date;
 }
 
-/** Returns the current instant and a 24-hour lookback window in the given IANA timezone context. */
+/** Validates an IANA timezone string; throws if invalid. */
+export function validateTimezone(timezone: string): void {
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: timezone });
+  } catch {
+    throw new Error(`Invalid IANA timezone: ${timezone}`);
+  }
+}
+
+export function isWithinWindow(date: Date, window: StandupWindow): boolean {
+  return date >= window.windowStart && date <= window.windowEnd;
+}
+
+/** Returns an inclusive rolling 24-hour window anchored to the execution instant. */
 export function getStandupWindow(
   timezone = "Asia/Manila",
   now: Date = new Date(),
 ): StandupWindow {
-  void timezone;
+  validateTimezone(timezone);
   const windowEnd = now;
   const windowStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   return { windowStart, windowEnd };

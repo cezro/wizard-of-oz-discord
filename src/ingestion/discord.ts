@@ -2,7 +2,7 @@ import type { AppConfig } from "../config.js";
 import type { DiscordRawMessage, StandupPipelineData, StandupTarget } from "../types.js";
 import { discordJson } from "../utils/discord-api.js";
 import { shouldIncludeMessage, toSanitizedMessage } from "../utils/sanitize.js";
-import type { StandupWindow } from "../utils/timezone.js";
+import { isWithinWindow, type StandupWindow } from "../utils/timezone.js";
 
 const PAGE_SIZE = 100;
 
@@ -14,12 +14,13 @@ export async function ingestStandupMessages(
   const rawMessages = await fetchChannelMessages(
     config.discordBotToken,
     target.channelId,
-    window.windowStart,
+    window,
   );
 
   const messages = rawMessages
     .filter(shouldIncludeMessage)
     .map(toSanitizedMessage)
+    .filter((m) => isWithinWindow(m.createdAt, window))
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   return {
@@ -33,7 +34,7 @@ export async function ingestStandupMessages(
 async function fetchChannelMessages(
   token: string,
   channelId: string,
-  windowStart: Date,
+  window: StandupWindow,
 ): Promise<DiscordRawMessage[]> {
   const collected: DiscordRawMessage[] = [];
   let before: string | undefined;
@@ -53,8 +54,8 @@ async function fetchChannelMessages(
 
     for (const message of page) {
       const createdAt = new Date(message.timestamp);
-      if (createdAt < windowStart) {
-        reachedWindowStart = true;
+      if (!isWithinWindow(createdAt, window)) {
+        if (createdAt < window.windowStart) reachedWindowStart = true;
         continue;
       }
       collected.push(message);
