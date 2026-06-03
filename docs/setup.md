@@ -18,7 +18,7 @@ The primary objective is to eliminate manual oversight and provide an automated,
 - **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
 - **Security:** The cron route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.
 - **Timezone Safety:** Per-guild IANA timezone (default `Asia/Manila`) is validated at pipeline start and used for schedule matching and embed date formatting. The fetch window is anchored to execution time, not server-local clock.
-- **Manual trigger:** `/standup summarize` (Manage Server only) force-runs the summary pipeline for the current server. Optional `date` (`YYYY-MM-DD` in the guild timezone) selects which calendar day to ingest from the DSM channel; if omitted or invalid, today is used. Manual runs use a full calendar-day window (local midnight through end of day), not the cron rolling 24-hour window.
+- **Manual trigger:** `/standup summarize` (Manage Server only) force-runs the summary pipeline for the current server. Optional `month`, `day`, and `year` (integers) select which calendar day to ingest in the guild timezone; any field omitted defaults to today’s value for that field. Invalid combinations (e.g. February 31) are rejected with an error. Manual runs use a full calendar-day window (local midnight through end of day), not the cron rolling 24-hour window.
 
 ### B. Message Ingestion & Sanitization
 
@@ -82,14 +82,15 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 | `/standup-config set` | Set DSM channel and optional timezone |
 | `/standup-config show` | Show channel, timezone, enabled state |
 | `/standup-config enable` / `disable` | Toggle automated reminders and summaries |
-| `/standup set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
-| `/standup set-summary-time` | Set daily summary hour/minute (default 17:00) |
-| `/standup show-schedule` | Show reminder/summary times and last run dates |
-| `/standup summarize` | Force-run the summary pipeline (optional `date`: `YYYY-MM-DD`, defaults to today) |
-| `/standup set-reporter-role` | Set which role’s members must post a daily DSM |
-| `/standup set-nudge-time` | Set when to remind members who have not posted |
-| `/standup clear-nudge-time` | Use the summary time for missing-DSM reminders |
+| `/standup-config set-reminder-time` | Set daily DSM reminder hour/minute (guild timezone) |
+| `/standup-config set-summary-time` | Set daily summary hour/minute (default 17:00) |
+| `/standup-config show-schedule` | Show reminder/summary times and last run dates |
+| `/standup-config set-reporter-role` | Set which role’s members must post a daily DSM |
+| `/standup-config set-nudge-time` | Set when to remind members who have not posted |
+| `/standup-config clear-nudge-time` | Use the summary time for missing-DSM reminders |
+| `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year`; unset fields default to today in guild timezone) |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
+| `/standup-debug` | Force-post the daily DSM reminder message (does not update `last_reminder_date`) |
 
 ### Discord bot intents (required for missing-DSM nudges)
 

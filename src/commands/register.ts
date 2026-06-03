@@ -21,9 +21,36 @@ const MINUTE_OPTION = {
   max_value: 59,
 };
 
+const SUMMARIZE_MONTH_OPTION = {
+  type: 4,
+  name: "month",
+  description: "Month (1–12). Defaults to current month (guild timezone).",
+  required: false,
+  min_value: 1,
+  max_value: 12,
+};
+
+const SUMMARIZE_DAY_OPTION = {
+  type: 4,
+  name: "day",
+  description: "Day (1–31). Defaults to current day (guild timezone).",
+  required: false,
+  min_value: 1,
+  max_value: 31,
+};
+
+const SUMMARIZE_YEAR_OPTION = {
+  type: 4,
+  name: "year",
+  description: "Year. Defaults to current year (guild timezone).",
+  required: false,
+  min_value: 2000,
+  max_value: 2100,
+};
+
 const STANDUP_CONFIG_COMMAND = {
   name: "standup-config",
-  description: "Configure the daily standup summarizer bot",
+  description: "Configure the daily standup summarizer for this server",
   default_member_permissions: MANAGE_GUILD_PERMISSION,
   options: [
     {
@@ -60,14 +87,6 @@ const STANDUP_CONFIG_COMMAND = {
       name: "disable",
       description: "Disable daily standup summaries for this server",
     },
-  ],
-};
-
-const STANDUP_COMMAND = {
-  name: "standup",
-  description: "Schedule and manual controls for the standup bot",
-  default_member_permissions: MANAGE_GUILD_PERMISSION,
-  options: [
     {
       type: 1,
       name: "set-reminder-time",
@@ -84,20 +103,6 @@ const STANDUP_COMMAND = {
       type: 1,
       name: "show-schedule",
       description: "Show reminder and summary schedule for this server",
-    },
-    {
-      type: 1,
-      name: "summarize",
-      description: "Force-run the summary pipeline now for this server",
-      options: [
-        {
-          type: 3,
-          name: "date",
-          description:
-            "Day to summarize (YYYY-MM-DD, guild timezone). Defaults to today.",
-          required: false,
-        },
-      ],
     },
     {
       type: 1,
@@ -124,6 +129,30 @@ const STANDUP_COMMAND = {
       name: "clear-nudge-time",
       description: "Use the summary time for missing-DSM reminders",
     },
+  ],
+};
+
+const STANDUP_DEBUG_COMMAND = {
+  name: "standup-debug",
+  description: "Debug: force-post the daily DSM reminder (not missing-reporter nudge)",
+  default_member_permissions: MANAGE_GUILD_PERMISSION,
+};
+
+const STANDUP_COMMAND = {
+  name: "standup",
+  description: "Manual standup actions for this server",
+  default_member_permissions: MANAGE_GUILD_PERMISSION,
+  options: [
+    {
+      type: 1,
+      name: "summarize",
+      description: "Force-run the summary pipeline now for this server",
+      options: [
+        SUMMARIZE_MONTH_OPTION,
+        SUMMARIZE_DAY_OPTION,
+        SUMMARIZE_YEAR_OPTION,
+      ],
+    },
     {
       type: 1,
       name: "remind-missing",
@@ -134,7 +163,7 @@ const STANDUP_COMMAND = {
 };
 
 export async function registerSlashCommands(config: AppConfig): Promise<void> {
-  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_COMMAND];
+  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_COMMAND, STANDUP_DEBUG_COMMAND];
 
   try {
     await discordJson(

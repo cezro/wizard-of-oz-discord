@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `date`, default today).
+1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts, and invalid DSM check-ins (heuristic in `src/utils/dsm-validation.ts`; attachment-only posts count). Same rules for summaries and missing-reporter nudges.
 4. **Order:** Oldest → newest before Gemini.
@@ -43,8 +43,8 @@ src/
   config.ts                   # env + resolveStandupTargets()
   storage/config-store.ts     # Supabase CRUD
   commands/register.ts        # slash command registration
-  commands/standup.ts         # schedule + nudge slash handlers
-  commands/standup-config.ts  # slash handlers
+  commands/standup.ts         # summarize + remind-missing handlers
+  commands/standup-config.ts  # channel, schedule, and role config handlers
   cron/standup-tick.ts        # reminder, nudge, summary tick
   standup/missing-reporters.ts
   discord/guild-members.ts    # paginated member list, filter by role

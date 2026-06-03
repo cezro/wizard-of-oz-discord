@@ -32,7 +32,7 @@ export async function runMissingReporterNudge(
 ): Promise<MissingReporterNudgeResult> {
   if (!target.reporterRoleId) {
     throw new Error(
-      "No reporter role configured. Run /standup set-reporter-role first.",
+      "No reporter role configured. Run /standup-config set-reporter-role first.",
     );
   }
 

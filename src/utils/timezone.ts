@@ -110,10 +110,15 @@ export function resolveNudgeSchedule(target: {
 
 const DATE_STRING_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export interface ResolvedSummarizeDate {
-  dateString: string;
-  usedFallback: boolean;
+export interface SummarizeDateParts {
+  month?: number;
+  day?: number;
+  year?: number;
 }
+
+export type ResolvedSummarizeDateParts =
+  | { ok: true; dateString: string }
+  | { ok: false; error: string };
 
 /** Validates YYYY-MM-DD and that it is a real calendar date. */
 export function isValidDateString(s: string): boolean {
@@ -127,25 +132,31 @@ export function isValidDateString(s: string): boolean {
   );
 }
 
-/** Resolves summarize date: option, else today; invalid option falls back to today. */
-export function resolveSummarizeDate(
+/** Resolves summarize date from optional parts; unset fields use today in guild timezone. */
+export function resolveSummarizeDateParts(
   timezone: string,
-  dateOption?: string,
+  parts: SummarizeDateParts,
   now: Date = new Date(),
-): ResolvedSummarizeDate {
+): ResolvedSummarizeDateParts {
   validateTimezone(timezone);
-  const today = getLocalTimeParts(timezone, now).dateString;
+  const [todayYear, todayMonth, todayDay] = getLocalTimeParts(timezone, now)
+    .dateString.split("-")
+    .map(Number);
 
-  if (!dateOption?.trim()) {
-    return { dateString: today, usedFallback: false };
+  const year = parts.year ?? todayYear;
+  const month = parts.month ?? todayMonth;
+  const day = parts.day ?? todayDay;
+
+  const dateString = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  if (!isValidDateString(dateString)) {
+    return {
+      ok: false,
+      error: `Invalid date: ${month}/${day}/${year}.`,
+    };
   }
 
-  const trimmed = dateOption.trim();
-  if (isValidDateString(trimmed)) {
-    return { dateString: trimmed, usedFallback: false };
-  }
-
-  return { dateString: today, usedFallback: true };
+  return { ok: true, dateString };
 }
 
 /** Inclusive calendar-day window in the given IANA timezone. */
