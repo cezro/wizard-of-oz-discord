@@ -52,7 +52,7 @@ export async function broadcastMissingReporterNudge(
     await postChannelMessage(config, channelId, {
       content: chunk.content,
       allowed_mentions: {
-        parse: ["users"],
+        parse: [],
         users: chunk.userIds,
       },
     });

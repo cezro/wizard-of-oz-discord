@@ -20,6 +20,7 @@ export class DiscordApiError extends Error {
 interface DiscordErrorBody {
   code?: number;
   message?: string;
+  errors?: Record<string, unknown>;
 }
 
 /** Maps common Discord API failures to actionable text for slash-command replies. */
@@ -43,12 +44,26 @@ export function formatUserFacingDiscordError(error: unknown): string {
     }
     const body = error.body as DiscordErrorBody | undefined;
     if (body?.message) {
-      return `Discord API error: ${body.message}`;
+      const detail = formatDiscordValidationErrors(body.errors);
+      return detail
+        ? `Discord API error: ${body.message}\n${detail}`
+        : `Discord API error: ${body.message}`;
     }
   }
 
   if (error instanceof Error) return error.message;
   return "Something went wrong.";
+}
+
+function formatDiscordValidationErrors(
+  errors: Record<string, unknown> | undefined,
+): string | null {
+  if (!errors || Object.keys(errors).length === 0) return null;
+  try {
+    return `\`\`\`json\n${JSON.stringify(errors, null, 2).slice(0, 1500)}\n\`\`\``;
+  } catch {
+    return null;
+  }
 }
 
 function sleep(ms: number): Promise<void> {
