@@ -6,6 +6,7 @@ import {
   NAV_HOME,
   NAV_ROLE,
   NAV_SCHEDULE,
+  NAV_TIMEZONE,
   TOGGLE_ENABLED,
 } from "./custom-ids.js";
 import { buildHubDescription } from "./format.js";
@@ -58,6 +59,13 @@ export function buildHomePayload(row: StandupConfigRow | null): InteractionMessa
             style: BTN_SECONDARY,
             label: "Reporter role",
             custom_id: NAV_ROLE,
+            disabled: !row,
+          },
+          {
+            type: BUTTON,
+            style: BTN_SECONDARY,
+            label: "Time region",
+            custom_id: NAV_TIMEZONE,
             disabled: !row,
           },
         ],

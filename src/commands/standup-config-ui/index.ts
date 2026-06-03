@@ -28,6 +28,10 @@ import {
   handleTimezoneModal,
 } from "./channel.js";
 import {
+  buildTimezonePanel,
+  handleTimezoneSelect,
+} from "./timezone.js";
+import {
   ACTIVE_DAYS_PREFIX,
   CHANNEL_PICK,
   CHANNEL_TIMEZONE_BTN,
@@ -37,10 +41,12 @@ import {
   NAV_HOME,
   NAV_ROLE,
   NAV_SCHEDULE,
+  NAV_TIMEZONE,
   ROLE_CLEAR,
   ROLE_PICK,
   SCHEDULE_PREFIX,
   TIMEZONE_MODAL_ID,
+  TIMEZONE_PICK,
   TOGGLE_ENABLED,
 } from "./custom-ids.js";
 import { buildHomePayload } from "./home.js";
@@ -147,6 +153,26 @@ export async function handleConfigUiInteraction(
 
     if (customId === CHANNEL_PICK) {
       return handleChannelSelect(
+        config,
+        guildId,
+        userId,
+        getSelectValues(interaction),
+        (id) => loadHomeRow(config, id),
+      );
+    }
+
+    if (customId === NAV_TIMEZONE) {
+      const row = await loadHomeRow(config, guildId);
+      const err = requireConfigured(row);
+      if (err) return err;
+      return updateMessage(buildTimezonePanel(row!));
+    }
+
+    if (customId === TIMEZONE_PICK) {
+      const row = await loadHomeRow(config, guildId);
+      const err = requireConfigured(row);
+      if (err) return err;
+      return handleTimezoneSelect(
         config,
         guildId,
         userId,

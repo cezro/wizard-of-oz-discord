@@ -46,7 +46,8 @@ src/
   commands/register.ts        # slash command registration
   commands/standup.ts         # summarize + remind-missing handlers
   commands/standup-config.ts  # re-exports standup-config-ui
-  commands/standup-config-ui/  # hub embed + nested panels (channel, schedule, active days, role)
+  commands/standup-config-ui/  # hub embed + nested panels (channel, time region, schedule, active days, role)
+  utils/timezone-presets.ts   # IANA preset list for Time region select
   cron/standup-tick.ts        # reminder, nudge, summary tick
   standup/reminder.ts         # daily DSM reminder + reporter pings
   standup/missing-reporters.ts

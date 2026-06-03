@@ -80,7 +80,7 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 
 | Command | Purpose |
 | :------ | :------ |
-| `/standup-config` | Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable |
+| `/standup-config` | Interactive hub: channel, **Time region** (IANA timezone presets + custom), schedule, active weekdays, reporter role, enable/disable |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year`; unset fields default to today in guild timezone) |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
 | `/standup-debug` | Force-post the daily DSM reminder message (does not update `last_reminder_date`) |
