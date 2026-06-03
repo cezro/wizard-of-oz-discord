@@ -5,11 +5,21 @@ import { Hono } from "hono";
 
 import { registerSlashCommands } from "./commands/register.js";
 import { loadConfig } from "./config.js";
+import { startDiscordGateway } from "./discord/gateway.js";
 import { verifyDiscordRequest } from "./discord/verify.js";
 import { handleInteraction } from "./discord/interactions.js";
 import { runAllPipelines } from "./pipeline.js";
 
 const config = loadConfig();
+const stopGateway = startDiscordGateway(config.discordBotToken);
+
+function shutdown(): void {
+  stopGateway();
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 const app = new Hono();
 
 function verifyCronAuth(authHeader: string | undefined): boolean {
