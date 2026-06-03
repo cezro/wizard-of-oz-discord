@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today).
+1. **Schedule:** Per-guild active weekdays (default Mon–Fri via `active_weekdays`); cron skips reminder/nudge/summary on other days. Default summary time 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts, and invalid DSM check-ins (heuristic in `src/utils/dsm-validation.ts`; attachment-only posts count). Same rules for summaries and missing-reporter nudges.
 4. **Order:** Oldest → newest before Gemini.
@@ -58,6 +58,8 @@ src/
   egress/discord.ts
 supabase/migrations/001_standup_config.sql
 supabase/migrations/003_standup_reporter_role.sql
+supabase/migrations/004_standup_active_weekdays.sql
+  utils/weekdays.ts
 ```
 
 ## Defaults

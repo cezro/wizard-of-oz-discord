@@ -1,5 +1,6 @@
 import type { AppConfig } from "../config.js";
 import type { StandupTarget } from "../types.js";
+import { normalizeActiveWeekdays } from "../utils/weekdays.js";
 import { getSupabase, type StandupConfigRow } from "./supabase.js";
 
 export interface UpsertConfigInput {
@@ -24,6 +25,11 @@ export interface UpdateReporterRoleInput {
   updatedBy: string;
 }
 
+export interface UpdateActiveWeekdaysInput {
+  activeWeekdays: number[];
+  updatedBy: string;
+}
+
 function rowToTarget(row: StandupConfigRow): StandupTarget {
   return {
     guildId: row.guild_id,
@@ -39,6 +45,7 @@ function rowToTarget(row: StandupConfigRow): StandupTarget {
     nudgeHour: row.nudge_hour,
     nudgeMinute: row.nudge_minute,
     lastNudgeDate: row.last_nudge_date,
+    activeWeekdays: normalizeActiveWeekdays(row.active_weekdays),
   };
 }
 
@@ -194,6 +201,36 @@ export async function markSummarySent(
   if (error) {
     throw new Error(`Failed to mark summary sent: ${error.message}`);
   }
+}
+
+export async function updateActiveWeekdays(
+  config: AppConfig,
+  guildId: string,
+  input: UpdateActiveWeekdaysInput,
+): Promise<StandupConfigRow> {
+  const existing = await getConfig(config, guildId);
+  if (!existing) {
+    throw new Error(
+      "No configuration found for this server. Run /standup-config set first.",
+    );
+  }
+
+  const supabase = getSupabase(config);
+  const { data, error } = await supabase
+    .from("standup_config")
+    .update({
+      active_weekdays: input.activeWeekdays,
+      updated_by: input.updatedBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("guild_id", guildId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update active weekdays: ${error.message}`);
+  }
+  return data;
 }
 
 export async function updateReporterRole(

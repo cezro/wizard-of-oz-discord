@@ -12,7 +12,7 @@ The primary objective is to eliminate manual oversight and provide an automated,
 
 ### A. Scheduling & Triggering (Ingress)
 
-- **Cadence:** A Render cron job hits `POST /cron/standup` **every minute, Monday through Friday**. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). The tick fires at most once per guild per calendar day for each action.
+- **Cadence:** A Render cron job hits `POST /cron/standup` **every minute**. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). Automated reminder, missing-DSM nudge, and summary actions run only on **active weekdays** for that guild (default **Mon–Fri** in the guild timezone; configure with `/standup-config set-active-days`). The tick fires at most once per guild per calendar day for each action.
 - **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM. When a reporter role is configured (`/standup-config set-reporter-role`), the reminder @-mentions every non-bot member with that role (same `allowed_mentions` pattern as the missing DSM nudge; requires **Server Members Intent**). If no reporter role is set, the reminder is text-only.
 - **Missing DSM nudge:** At the configured nudge time (defaults to summary time if not set), the bot mentions members who have the configured reporter role but have not posted a **valid** DSM check-in in the standup channel within the rolling 24-hour window. Requires **Server Members Intent** in the Discord Developer Portal.
 - **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
@@ -88,6 +88,7 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 | `/standup-config set-reporter-role` | Set which role’s members must post a daily DSM |
 | `/standup-config set-nudge-time` | Set when to remind members who have not posted |
 | `/standup-config clear-nudge-time` | Use the summary time for missing-DSM reminders |
+| `/standup-config set-active-days` | Set which weekdays run automated reminder, nudge, and summary (default Mon–Fri; presets `weekdays`, `weekend`, `all`, or `mon,tue,...`) |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year`; unset fields default to today in guild timezone) |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
 | `/standup-debug` | Force-post the daily DSM reminder message (does not update `last_reminder_date`) |
@@ -102,7 +103,7 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 
 Do not assign `@everyone` as the reporter role (members often omit that role id from their `roles` array).
 
-Run `supabase/migrations/001_standup_config.sql`, `002_standup_schedule.sql`, and `003_standup_reporter_role.sql` in Supabase before using schedule and nudge commands.
+Run `supabase/migrations/001_standup_config.sql` through `004_standup_active_weekdays.sql` in Supabase before using schedule, nudge, and active-day commands.
 
 ```env
 DISCORD_BOT_TOKEN=your_discord_bot_token

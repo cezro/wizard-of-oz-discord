@@ -12,6 +12,8 @@ export interface StandupTarget {
   nudgeHour: number | null;
   nudgeMinute: number;
   lastNudgeDate: string | null;
+  /** JS weekday 0–6 (Sun–Sat); default Mon–Fri when unset in DB */
+  activeWeekdays: number[];
 }
 
 export interface SanitizedMessage {

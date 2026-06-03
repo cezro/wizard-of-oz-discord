@@ -14,6 +14,7 @@ import {
   configRowToTarget,
   getConfig,
   setEnabled,
+  updateActiveWeekdays,
   updateReporterRole,
   updateSchedule,
   upsertConfig,
@@ -23,6 +24,11 @@ import {
   formatScheduleTime,
   resolveNudgeSchedule,
 } from "../utils/timezone.js";
+import {
+  formatActiveWeekdays,
+  normalizeActiveWeekdays,
+  parseActiveWeekdays,
+} from "../utils/weekdays.js";
 
 export type { DiscordInteraction };
 
@@ -113,6 +119,7 @@ export async function handleStandupConfigCommand(
             `**Channel:** <#${row.channel_id}>`,
             `**Timezone:** \`${row.timezone}\``,
             `**Enabled:** ${row.enabled ? "yes" : "no"}`,
+            `**Active days:** ${formatActiveWeekdays(normalizeActiveWeekdays(row.active_weekdays))}`,
             `**Updated:** ${new Date(row.updated_at).toLocaleString("en-US", { timeZone: row.timezone })}`,
           ].join("\n"),
         );
@@ -194,6 +201,7 @@ export async function handleStandupConfigCommand(
             `**Channel:** <#${row.channel_id}>`,
             `**Timezone:** \`${row.timezone}\``,
             `**Reporter role:** ${reporterRole}`,
+            `**Active days:** ${formatActiveWeekdays(normalizeActiveWeekdays(row.active_weekdays))}`,
             `**Reminder:** ${reminder}`,
             `**Missing DSM nudge:** ${nudge}`,
             `**Summary:** ${summary}`,
@@ -247,6 +255,21 @@ export async function handleStandupConfigCommand(
         const time = formatScheduleTime(resolved.hour, resolved.minute);
         return ephemeral(
           `Missing DSM nudge will use the summary time (**${time}** \`${row.timezone}\`).`,
+        );
+      }
+
+      case "set-active-days": {
+        const daysOption = getSubcommandOption(interaction, "days");
+        const parsed = parseActiveWeekdays(daysOption);
+        if (!parsed.ok) return ephemeral(parsed.error);
+
+        const row = await updateActiveWeekdays(config, guildId, {
+          activeWeekdays: parsed.weekdays,
+          updatedBy: userId,
+        });
+
+        return ephemeral(
+          `Automated reminders, nudges, and summaries will run on: **${formatActiveWeekdays(normalizeActiveWeekdays(row.active_weekdays))}** (\`${row.timezone}\`).`,
         );
       }
 

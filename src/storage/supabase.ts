@@ -20,6 +20,7 @@ export interface StandupConfigRow {
   nudge_hour: number | null;
   nudge_minute: number;
   last_nudge_date: string | null;
+  active_weekdays?: number[] | null;
 }
 
 let client: SupabaseClient | null = null;

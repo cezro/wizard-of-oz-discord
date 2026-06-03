@@ -9,6 +9,7 @@ import {
   markSummarySent,
 } from "../storage/config-store.js";
 import type { StandupTarget } from "../types.js";
+import { isActiveWeekday } from "../utils/weekdays.js";
 import {
   getLocalTimeParts,
   matchesSchedule,
@@ -54,6 +55,10 @@ async function processGuildTick(
   };
 
   try {
+    if (!isActiveWeekday(target.activeWeekdays, target.timezone, now)) {
+      return result;
+    }
+
     const local = getLocalTimeParts(target.timezone, now);
 
     if (
