@@ -115,6 +115,14 @@ export function deferredEphemeral(): InteractionResponse {
   };
 }
 
+/** Deferred reply visible in the channel where the command was used. */
+export function deferredMessage(): InteractionResponse {
+  return {
+    type: RESPONSE_DEFERRED_MESSAGE,
+    data: {},
+  };
+}
+
 export function getUserId(interaction: DiscordInteraction): string {
   return interaction.member?.user.id ?? interaction.user?.id ?? "unknown";
 }

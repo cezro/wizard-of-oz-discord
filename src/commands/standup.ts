@@ -2,6 +2,7 @@ import type { AppConfig } from "../config.js";
 import { editDeferredInteraction } from "../discord/interaction-followup.js";
 import {
   deferredEphemeral,
+  deferredMessage,
   ephemeral,
   getSubcommand,
   getSubcommandIntegerOption,
@@ -167,6 +168,11 @@ export async function handleStandupCommand(
           return ephemeral(resolved.error);
         }
 
+        const channelId = interaction.channel_id;
+        if (!channelId) {
+          return ephemeral("Missing channel context; try again in a server channel.");
+        }
+
         const token = interaction.token;
         if (!token) {
           return ephemeral("Missing interaction token; try again.");
@@ -183,10 +189,14 @@ export async function handleStandupCommand(
           token,
           target,
           row.timezone,
-          { window, summaryDate: resolved.dateString },
+          {
+            window,
+            summaryDate: resolved.dateString,
+            broadcastChannelId: channelId,
+          },
         );
 
-        return deferredEphemeral();
+        return deferredMessage();
       }
 
       default:

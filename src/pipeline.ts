@@ -24,6 +24,8 @@ export interface RunPipelineOptions {
   window?: StandupWindow;
   /** YYYY-MM-DD for embed title when summarizing a chosen calendar day */
   summaryDate?: string;
+  /** Post summary here instead of the configured standup channel (ingestion unchanged). */
+  broadcastChannelId?: string;
 }
 
 export async function runPipeline(
@@ -38,14 +40,17 @@ export async function runPipeline(
     ? dateStringToReferenceDate(target.timezone, options.summaryDate)
     : undefined;
   const authorDisplayNames = buildAuthorDisplayNameMap(data.messages);
-  const posted = await broadcastResult(config, target, processed, {
+  const broadcastTarget = options?.broadcastChannelId
+    ? { ...target, channelId: options.broadcastChannelId }
+    : target;
+  const posted = await broadcastResult(config, broadcastTarget, processed, {
     titleDate,
     authorDisplayNames,
   });
 
   return {
     guildId: target.guildId,
-    channelId: target.channelId,
+    channelId: broadcastTarget.channelId,
     messageCount: data.messages.length,
     posted,
   };
