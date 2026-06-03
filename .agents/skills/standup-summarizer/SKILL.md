@@ -23,7 +23,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `date`, default today).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
-3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts.
+3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts, and invalid DSM check-ins (heuristic in `src/utils/dsm-validation.ts`; attachment-only posts count). Same rules for summaries and missing-reporter nudges.
 4. **Order:** Oldest → newest before Gemini.
 5. **Summary headings (exact):**
    - `### Key Accomplishments`
@@ -33,7 +33,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 7. **Egress:** Bot API only; Components V2 Container + Text Display title `📊 Daily Standup Summary - [date]`; hidden `standup-summary-YYYY-MM-DD.md` attachment with **Download Markdown** link button; file export uses `@displayName` not `<@userId>`.
 8. **Cron security:** `Authorization: Bearer ${CRON_SECRET}` on `POST /cron/standup`.
 9. **Channel config:** Per-server via Supabase only (`/standup-config set`); cron loads all enabled rows.
-10. **Missing DSM nudge:** Same rolling 24h ingestion window as cron summary; compares role members (`GET /guilds/{id}/members`) to message `authorId`s; cron marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.
+10. **Missing DSM nudge:** Same rolling 24h ingestion window as cron summary; compares role members (`GET /guilds/{id}/members`) to authors with **valid** check-ins only; invalid posts reported in `/standup remind-missing` ephemeral reply; cron marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.
 
 ## File map
 
@@ -52,6 +52,7 @@ src/
   discord/verify.ts           # interaction signatures
   pipeline.ts                 # runPipeline / runAllPipelines
   ingestion/discord.ts
+  utils/dsm-validation.ts
   processing/gemini.ts, prompts.ts
   egress/discord.ts
 supabase/migrations/001_standup_config.sql

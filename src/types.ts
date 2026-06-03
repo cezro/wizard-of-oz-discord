@@ -23,11 +23,17 @@ export interface SanitizedMessage {
   createdAt: Date;
 }
 
+export interface InvalidCheckIn {
+  authorId: string;
+  preview: string;
+}
+
 export interface StandupPipelineData {
   channelId: string;
   windowStart: Date;
   windowEnd: Date;
   messages: SanitizedMessage[];
+  invalidCheckIns: InvalidCheckIn[];
 }
 
 export type ProcessResult =
@@ -53,4 +59,5 @@ export interface DiscordRawMessage {
   member?: {
     nick?: string | null;
   };
+  attachments?: { id: string }[];
 }

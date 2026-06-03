@@ -14,6 +14,7 @@ import {
 import { requireManageGuild } from "../discord/permissions.js";
 import { runPipeline, type RunPipelineOptions } from "../pipeline.js";
 import { runMissingReporterNudge } from "../standup/missing-reporters.js";
+import type { InvalidCheckIn } from "../types.js";
 import {
   configRowToTarget,
   getConfig,
@@ -72,24 +73,10 @@ async function runRemindMissingAndFollowUp(
 ): Promise<void> {
   try {
     const result = await runMissingReporterNudge(config, target);
-    if (!result.posted) {
-      await editDeferredInteraction(
-        applicationId,
-        interactionToken,
-        "Everyone with the reporter role has posted their DSM in the rolling 24-hour window.",
-      );
-      return;
-    }
-
     await editDeferredInteraction(
       applicationId,
       interactionToken,
-      [
-        "Missing DSM reminder posted.",
-        `**Mentioned:** ${result.missingCount} member(s)`,
-        `**Expected reporters:** ${result.expectedCount}`,
-        `**Channel:** <#${target.channelId}>`,
-      ].join("\n"),
+      formatRemindMissingReply(result, target.channelId),
     );
   } catch (error) {
     await editDeferredInteraction(
@@ -98,6 +85,39 @@ async function runRemindMissingAndFollowUp(
       formatUserFacingDiscordError(error),
     );
   }
+}
+
+function formatRemindMissingReply(
+  result: {
+    posted: boolean;
+    missingCount: number;
+    expectedCount: number;
+    invalidCheckIns: InvalidCheckIn[];
+  },
+  channelId: string,
+): string {
+  const lines: string[] = [];
+
+  if (!result.posted) {
+    lines.push(
+      "Everyone with the reporter role has posted a valid DSM in the rolling 24-hour window.",
+    );
+  } else {
+    lines.push("Missing DSM reminder posted.");
+    lines.push(`**Mentioned:** ${result.missingCount} member(s)`);
+    lines.push(`**Expected reporters:** ${result.expectedCount}`);
+    lines.push(`**Channel:** <#${channelId}>`);
+  }
+
+  if (result.invalidCheckIns.length > 0) {
+    lines.push("");
+    lines.push("**Invalid check-ins** (do not count toward completion):");
+    for (const entry of result.invalidCheckIns) {
+      lines.push(`- <@${entry.authorId}>: \`${entry.preview}\``);
+    }
+  }
+
+  return lines.join("\n");
 }
 
 function formatNudgeSchedule(row: {

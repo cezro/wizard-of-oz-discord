@@ -2,7 +2,7 @@ import type { AppConfig } from "../config.js";
 import { fetchMemberIdsWithRole } from "../discord/guild-members.js";
 import { broadcastMissingReporterNudge } from "../egress/discord.js";
 import { ingestStandupMessages } from "../ingestion/discord.js";
-import type { StandupTarget } from "../types.js";
+import type { InvalidCheckIn, StandupTarget } from "../types.js";
 import { discordJson } from "../utils/discord-api.js";
 import { getStandupWindow } from "../utils/timezone.js";
 
@@ -10,6 +10,7 @@ export interface MissingReporterNudgeResult {
   missingCount: number;
   posted: boolean;
   expectedCount: number;
+  invalidCheckIns: InvalidCheckIn[];
 }
 
 export function getPostedAuthorIds(
@@ -36,15 +37,16 @@ export async function runMissingReporterNudge(
   }
 
   const window = getStandupWindow(target.timezone);
-  const data = await ingestStandupMessages(config, target, window);
-  const postedIds = getPostedAuthorIds(data.messages);
-
   const expectedIds = await getExpectedReporterIds(
     config,
     target.guildId,
     target.reporterRoleId,
   );
 
+  const data = await ingestStandupMessages(config, target, window, {
+    expectedReporterIds: expectedIds,
+  });
+  const postedIds = getPostedAuthorIds(data.messages);
   const missingIds = findMissingReporterIds(expectedIds, postedIds);
 
   if (missingIds.length === 0) {
@@ -52,6 +54,7 @@ export async function runMissingReporterNudge(
       missingCount: 0,
       posted: false,
       expectedCount: expectedIds.length,
+      invalidCheckIns: data.invalidCheckIns,
     };
   }
 
@@ -61,6 +64,7 @@ export async function runMissingReporterNudge(
     missingCount: missingIds.length,
     posted: true,
     expectedCount: expectedIds.length,
+    invalidCheckIns: data.invalidCheckIns,
   };
 }
 

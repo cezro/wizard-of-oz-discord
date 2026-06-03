@@ -1,15 +1,32 @@
 import type { AppConfig } from "../config.js";
-import type { DiscordRawMessage, StandupPipelineData, StandupTarget } from "../types.js";
+import type {
+  DiscordRawMessage,
+  InvalidCheckIn,
+  StandupPipelineData,
+  StandupTarget,
+} from "../types.js";
+import { truncateCheckInPreview } from "../utils/dsm-validation.js";
 import { discordJson } from "../utils/discord-api.js";
-import { shouldIncludeMessage, toSanitizedMessage } from "../utils/sanitize.js";
+import {
+  isEligibleStandupMessage,
+  shouldIncludeMessage,
+  stripEmojiMarkup,
+  toSanitizedMessage,
+} from "../utils/sanitize.js";
 import { isWithinWindow, type StandupWindow } from "../utils/timezone.js";
 
 const PAGE_SIZE = 100;
+
+export interface IngestStandupOptions {
+  /** When set, invalidCheckIns only includes these author IDs. */
+  expectedReporterIds?: string[];
+}
 
 export async function ingestStandupMessages(
   config: AppConfig,
   target: StandupTarget,
   window: StandupWindow,
+  options?: IngestStandupOptions,
 ): Promise<StandupPipelineData> {
   const rawMessages = await fetchChannelMessages(
     config.discordBotToken,
@@ -23,12 +40,53 @@ export async function ingestStandupMessages(
     .filter((m) => isWithinWindow(m.createdAt, window))
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
+  const expectedSet = options?.expectedReporterIds
+    ? new Set(options.expectedReporterIds)
+    : undefined;
+
+  const invalidCheckIns = expectedSet
+    ? collectInvalidCheckIns(rawMessages, messages, expectedSet)
+    : [];
+
   return {
     channelId: target.channelId,
     windowStart: window.windowStart,
     windowEnd: window.windowEnd,
     messages,
+    invalidCheckIns,
   };
+}
+
+function collectInvalidCheckIns(
+  rawMessages: DiscordRawMessage[],
+  validMessages: { authorId: string }[],
+  expectedAuthorIds?: Set<string>,
+): InvalidCheckIn[] {
+  const validAuthorIds = new Set(validMessages.map((m) => m.authorId));
+  const invalidByAuthor = new Map<string, string>();
+
+  for (const raw of rawMessages) {
+    if (!isEligibleStandupMessage(raw)) continue;
+    if (shouldIncludeMessage(raw)) continue;
+    if (validAuthorIds.has(raw.author.id)) continue;
+    if (expectedAuthorIds && !expectedAuthorIds.has(raw.author.id)) continue;
+    if (!hasCheckInAttempt(raw)) continue;
+
+    invalidByAuthor.set(
+      raw.author.id,
+      truncateCheckInPreview(raw.content.trim() || "(empty message)"),
+    );
+  }
+
+  return [...invalidByAuthor.entries()].map(([authorId, preview]) => ({
+    authorId,
+    preview,
+  }));
+}
+
+function hasCheckInAttempt(message: DiscordRawMessage): boolean {
+  if (message.attachments?.length) return true;
+  return stripEmojiMarkup(message.content).length > 0;
 }
 
 async function fetchChannelMessages(
