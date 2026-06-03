@@ -18,6 +18,7 @@ export interface SanitizedMessage {
   id: string;
   authorId: string;
   authorMention: string;
+  authorDisplayName: string;
   content: string;
   createdAt: Date;
 }
@@ -46,5 +47,10 @@ export interface DiscordRawMessage {
   author: {
     id: string;
     bot?: boolean;
+    username: string;
+    global_name?: string | null;
+  };
+  member?: {
+    nick?: string | null;
   };
 }

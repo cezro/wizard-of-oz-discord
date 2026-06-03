@@ -1,13 +1,15 @@
 import type { AppConfig } from "../config.js";
 import type { ProcessResult, StandupTarget } from "../types.js";
 import { discordJson } from "../utils/discord-api.js";
+import { markdownForFileExport } from "../utils/markdown-export.js";
 import {
   formatDateInTimezone,
   getLocalTimeParts,
 } from "../utils/timezone.js";
 
 const EMBED_COLOR = 0x5865f2;
-const EMBED_DESCRIPTION_LIMIT = 4096;
+const SUMMARY_TEXT_LIMIT = 4096;
+const IS_COMPONENTS_V2 = 1 << 15;
 const EMPTY_DAY_MESSAGE =
   "No standup updates recorded for today! Hope everyone had a productive day.";
 const REMINDER_MESSAGE =
@@ -15,6 +17,12 @@ const REMINDER_MESSAGE =
 const MISSING_NUDGE_PREFIX =
   "**End of Day DSM Reminder** — Please post your async DSM update. Still waiting on: ";
 const DISCORD_CONTENT_LIMIT = 2000;
+
+const COMPONENT_TYPE_ACTION_ROW = 1;
+const COMPONENT_TYPE_BUTTON = 2;
+const COMPONENT_TYPE_TEXT_DISPLAY = 10;
+const COMPONENT_TYPE_CONTAINER = 17;
+const BUTTON_STYLE_LINK = 5;
 
 interface DiscordEmbed {
   title: string;
@@ -37,6 +45,34 @@ interface ChannelMessageBody {
 interface MessageAttachment {
   filename: string;
   content: string;
+}
+
+interface DiscordMessageComponent {
+  type: number;
+  id?: number;
+  accent_color?: number;
+  components?: DiscordMessageComponent[];
+  content?: string;
+  style?: number;
+  label?: string;
+  url?: string;
+}
+
+interface ComponentsV2MessageBody {
+  flags: number;
+  components: DiscordMessageComponent[];
+  allowed_mentions?: AllowedMentions;
+}
+
+interface PatchMessageBody {
+  flags: number;
+  components: DiscordMessageComponent[];
+  attachments: { id: string; filename: string }[];
+}
+
+interface DiscordCreatedMessage {
+  id: string;
+  attachments: { id: string; url: string; filename: string }[];
 }
 
 const MAX_ALLOWED_USER_MENTIONS = 100;
@@ -111,7 +147,7 @@ export async function broadcastResult(
   config: AppConfig,
   target: StandupTarget,
   result: ProcessResult,
-  opts?: { titleDate?: Date },
+  opts?: { titleDate?: Date; authorDisplayNames?: Map<string, string> },
 ): Promise<"empty" | "summary"> {
   if (result.kind === "empty") {
     await postChannelMessage(config, target.channelId, {
@@ -122,42 +158,100 @@ export async function broadcastResult(
 
   const titleDate = opts?.titleDate ?? new Date();
   const dateString = getLocalTimeParts(target.timezone, titleDate).dateString;
-  const { description, truncated } = truncateEmbedDescription(result.markdown);
+  const formattedDate = formatDateInTimezone(target.timezone, titleDate);
+  const { description, truncated } = truncateSummaryText(result.markdown);
+  const filename = `standup-summary-${dateString}.md`;
+  const exportMarkdown = markdownForFileExport(
+    result.markdown,
+    opts?.authorDisplayNames ?? new Map(),
+  );
 
-  const embed: DiscordEmbed = {
-    title: `📊 Daily Standup Summary - ${formatDateInTimezone(target.timezone, titleDate)}`,
-    description,
-    color: EMBED_COLOR,
-  };
+  const containerChildren: DiscordMessageComponent[] = [
+    {
+      type: COMPONENT_TYPE_TEXT_DISPLAY,
+      content: `# 📊 Daily Standup Summary - ${formattedDate}\n\n${description}`,
+    },
+  ];
 
   if (truncated) {
-    embed.footer = {
-      text: "Embed truncated — full summary attached as .md file.",
-    };
+    containerChildren.push({
+      type: COMPONENT_TYPE_TEXT_DISPLAY,
+      content:
+        "-# Full summary available via Download Markdown below.",
+    });
   }
 
-  await postChannelMessage(
+  const initialBody: ComponentsV2MessageBody = {
+    flags: IS_COMPONENTS_V2,
+    components: [
+      {
+        type: COMPONENT_TYPE_CONTAINER,
+        accent_color: EMBED_COLOR,
+        components: containerChildren,
+      },
+    ],
+  };
+
+  const created = await postComponentsV2Message(
     config,
     target.channelId,
-    { embeds: [embed] },
-    {
-      filename: `standup-summary-${dateString}.md`,
-      content: result.markdown,
-    },
+    initialBody,
+    { filename, content: exportMarkdown },
   );
+
+  const attachment = created.attachments[0];
+  if (!attachment) {
+    console.error(
+      "[egress/discord] Summary posted without attachment; skipping download button",
+    );
+    return "summary";
+  }
+
+  try {
+    await patchChannelMessage(config, target.channelId, created.id, {
+      flags: IS_COMPONENTS_V2,
+      components: [
+        {
+          type: COMPONENT_TYPE_CONTAINER,
+          accent_color: EMBED_COLOR,
+          components: [
+            ...containerChildren,
+            {
+              type: COMPONENT_TYPE_ACTION_ROW,
+              components: [
+                {
+                  type: COMPONENT_TYPE_BUTTON,
+                  style: BUTTON_STYLE_LINK,
+                  label: "Download Markdown",
+                  url: attachment.url,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      attachments: [{ id: attachment.id, filename: attachment.filename }],
+    });
+  } catch (error) {
+    console.error(
+      "[egress/discord] Failed to add download button to summary message:",
+      error,
+    );
+  }
+
   return "summary";
 }
 
-function truncateEmbedDescription(markdown: string): {
+function truncateSummaryText(markdown: string): {
   description: string;
   truncated: boolean;
 } {
-  if (markdown.length <= EMBED_DESCRIPTION_LIMIT) {
+  if (markdown.length <= SUMMARY_TEXT_LIMIT) {
     return { description: markdown, truncated: false };
   }
 
   const suffix = "\n\n… _(truncated)_";
-  const maxLen = EMBED_DESCRIPTION_LIMIT - suffix.length;
+  const maxLen = SUMMARY_TEXT_LIMIT - suffix.length;
   return {
     description: markdown.slice(0, maxLen) + suffix,
     truncated: true,
@@ -168,18 +262,19 @@ async function postChannelMessage(
   config: AppConfig,
   channelId: string,
   body: ChannelMessageBody,
-  attachment?: MessageAttachment,
 ): Promise<void> {
-  const path = `/channels/${channelId}/messages`;
+  await discordJson(config.discordBotToken, `/channels/${channelId}/messages`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
 
-  if (!attachment) {
-    await discordJson(config.discordBotToken, path, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    return;
-  }
-
+async function postComponentsV2Message(
+  config: AppConfig,
+  channelId: string,
+  body: ComponentsV2MessageBody,
+  attachment: MessageAttachment,
+): Promise<DiscordCreatedMessage> {
   const form = new FormData();
   form.append("payload_json", JSON.stringify(body));
   form.append(
@@ -188,8 +283,28 @@ async function postChannelMessage(
     attachment.filename,
   );
 
-  await discordJson(config.discordBotToken, path, {
-    method: "POST",
-    body: form,
-  });
+  return discordJson<DiscordCreatedMessage>(
+    config.discordBotToken,
+    `/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      body: form,
+    },
+  );
+}
+
+async function patchChannelMessage(
+  config: AppConfig,
+  channelId: string,
+  messageId: string,
+  body: PatchMessageBody,
+): Promise<void> {
+  await discordJson(
+    config.discordBotToken,
+    `/channels/${channelId}/messages/${messageId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+  );
 }

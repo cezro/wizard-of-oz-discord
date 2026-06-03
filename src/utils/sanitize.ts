@@ -25,11 +25,22 @@ export function shouldIncludeMessage(message: DiscordRawMessage): boolean {
   return true;
 }
 
+function resolveAuthorDisplayName(message: DiscordRawMessage): string {
+  const nick = message.member?.nick?.trim();
+  if (nick) return nick;
+
+  const globalName = message.author.global_name?.trim();
+  if (globalName) return globalName;
+
+  return message.author.username;
+}
+
 export function toSanitizedMessage(message: DiscordRawMessage): SanitizedMessage {
   return {
     id: message.id,
     authorId: message.author.id,
     authorMention: `<@${message.author.id}>`,
+    authorDisplayName: resolveAuthorDisplayName(message),
     content: message.content.trim(),
     createdAt: new Date(message.timestamp),
   };

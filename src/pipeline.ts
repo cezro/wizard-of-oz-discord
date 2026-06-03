@@ -4,6 +4,7 @@ import { broadcastResult } from "./egress/discord.js";
 import { ingestStandupMessages } from "./ingestion/discord.js";
 import { processStandup } from "./processing/gemini.js";
 import type { PipelineResult, StandupTarget } from "./types.js";
+import { buildAuthorDisplayNameMap } from "./utils/markdown-export.js";
 import {
   dateStringToReferenceDate,
   getStandupWindow,
@@ -36,7 +37,11 @@ export async function runPipeline(
   const titleDate = options?.summaryDate
     ? dateStringToReferenceDate(target.timezone, options.summaryDate)
     : undefined;
-  const posted = await broadcastResult(config, target, processed, { titleDate });
+  const authorDisplayNames = buildAuthorDisplayNameMap(data.messages);
+  const posted = await broadcastResult(config, target, processed, {
+    titleDate,
+    authorDisplayNames,
+  });
 
   return {
     guildId: target.guildId,
