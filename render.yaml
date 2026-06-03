@@ -42,7 +42,10 @@ services:
   - type: cron
     name: standup-daily-cron
     schedule: "0 9 * * 1-5"
-    command: curl -sS -X POST "https://standup-summarizer.onrender.com/cron/standup" -H "Authorization: Bearer ${CRON_SECRET}"
+    # Quote the whole command — unquoted colons in "Authorization: Bearer" break YAML parsing
+    command: >-
+      curl -sS -X POST "https://standup-summarizer.onrender.com/cron/standup"
+      -H "Authorization: Bearer ${CRON_SECRET}"
     envVars:
       - key: CRON_SECRET
         sync: false

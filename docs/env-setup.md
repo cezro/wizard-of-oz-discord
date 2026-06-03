@@ -18,7 +18,13 @@ Copy [`.env.example`](../.env.example) to `.env` and fill in the values below. N
 4. Click **Reset Token** or **View Token** and copy the value.
 5. On the same page, enable **MESSAGE CONTENT INTENT** (required to read standup text).
 
-**Invite the bot to your server:** **OAuth2** → **URL Generator** → scopes: `bot`, `applications.commands` → permissions: View Channel, Read Message History, Send Messages, Embed Links.
+**Invite the bot to your server:** **OAuth2** → **URL Generator**:
+
+1. Under **Scopes**, enable **`bot`** and **`applications.commands`** (both are required).
+2. Under **Bot Permissions**, enable: View Channel, Read Message History, Send Messages, Embed Links.
+3. Copy the generated URL, open it in a browser, and select your server.
+
+Using only `applications.commands` (without `bot`) can show the app under **Server Settings → Integrations** without adding the bot user to the member list. If that happened, generate a new URL with both scopes and authorize again on the same server (you do not need to kick the app first).
 
 ---
 
@@ -159,6 +165,62 @@ See [Google AI models](https://ai.google.dev/gemini-api/docs/models) for other o
 1. With Developer Mode on, right-click the standup channel → **Copy Channel ID**.
 
 **Leave unset** for the recommended flow (`/standup-config set` writes to Supabase).
+
+---
+
+## Bot not in member list?
+
+This project is an **HTTP-only** bot (REST + Interactions). It does not connect to Discord’s Gateway, so the bot will appear **offline (gray)** when it is a member—not green/online. That is normal and does not break standups or slash commands.
+
+If the bot does not appear in the member list **at all** (even after searching), the bot user was likely never added to the guild.
+
+### Integrations vs member list
+
+| Location | Meaning |
+|----------|---------|
+| **Server Settings → Integrations** | An application is authorized (commands, webhooks, or app install). |
+| **Member list / Server Settings → Members** | The **bot user** is a server member (requires the `bot` OAuth scope on invite). |
+
+### Fix: re-invite with both scopes
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) → your app → **OAuth2** → **URL Generator**.
+2. Scopes: **`bot`** and **`applications.commands`**.
+3. Bot permissions: View Channel, Read Message History, Send Messages, Embed Links.
+4. Open the URL and authorize on the correct server.
+
+Also check **Server Settings → Members** (search the bot name), not only the channel sidebar. Enable offline members in **User Settings → Appearance** if needed.
+
+### Confirm membership (API)
+
+Set `DISCORD_GUILD_ID` in `.env` to your server ID (right-click server → Copy Server ID). Then:
+
+```powershell
+# PowerShell (loads .env from project root)
+cd path\to\wizard-of-oz-discord
+node --import dotenv/config -e "
+const g = process.env.DISCORD_GUILD_ID;
+const a = process.env.DISCORD_APPLICATION_ID;
+const t = process.env.DISCORD_BOT_TOKEN;
+fetch('https://discord.com/api/v10/guilds/' + g + '/members/' + a, {
+  headers: { Authorization: 'Bot ' + t }
+}).then(r => r.json().then(j => console.log(r.status, j)));
+"
+```
+
+Or with curl (replace placeholders):
+
+```bash
+curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
+  "https://discord.com/api/v10/guilds/GUILD_ID/members/APPLICATION_ID"
+```
+
+| Response | Meaning |
+|----------|---------|
+| **200** + member JSON | Bot is in the guild. If the sidebar still hides it, expand offline members or check channel vs server member views. |
+| **404** Unknown Member | Bot was not added with the `bot` scope; re-invite using the steps above. |
+| **400** on `guild_id` | `DISCORD_GUILD_ID` is missing or not a numeric snowflake ID. |
+
+`APPLICATION_ID` is the same value as `DISCORD_APPLICATION_ID`.
 
 ---
 
