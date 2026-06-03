@@ -147,7 +147,6 @@ const STANDUP_DEBUG_COMMAND = {
 const STANDUP_COMMAND = {
   name: "standup",
   description: "Manual standup actions for this server",
-  default_member_permissions: MANAGE_GUILD_PERMISSION,
   options: [
     {
       type: 1,

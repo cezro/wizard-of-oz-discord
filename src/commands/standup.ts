@@ -9,7 +9,6 @@ import {
   type DiscordInteraction,
   type InteractionResponse,
 } from "../discord/interaction-utils.js";
-import { requireManageGuild } from "../discord/permissions.js";
 import { runPipeline, type RunPipelineOptions } from "../pipeline.js";
 import { runMissingReporterNudge } from "../standup/missing-reporters.js";
 import { configRowToTarget, getConfig } from "../storage/config-store.js";
@@ -110,10 +109,6 @@ export async function handleStandupCommand(
   config: AppConfig,
   interaction: DiscordInteraction,
 ): Promise<InteractionResponse> {
-  if (!requireManageGuild(interaction)) {
-    return ephemeral("You need **Manage Server** permission to use this command.");
-  }
-
   const guildResult = requireGuild(interaction);
   if (!guildResult.ok) return guildResult.response;
   const { guildId } = guildResult;
