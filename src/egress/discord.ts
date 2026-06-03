@@ -1,7 +1,10 @@
 import type { AppConfig } from "../config.js";
 import type { ProcessResult, StandupTarget } from "../types.js";
 import { discordJson } from "../utils/discord-api.js";
-import { formatDateInTimezone } from "../utils/timezone.js";
+import {
+  formatDateInTimezone,
+  getLocalTimeParts,
+} from "../utils/timezone.js";
 
 const EMBED_COLOR = 0x5865f2;
 const EMBED_DESCRIPTION_LIMIT = 4096;
@@ -29,6 +32,11 @@ interface ChannelMessageBody {
   content?: string;
   embeds?: DiscordEmbed[];
   allowed_mentions?: AllowedMentions;
+}
+
+interface MessageAttachment {
+  filename: string;
+  content: string;
 }
 
 const MAX_ALLOWED_USER_MENTIONS = 100;
@@ -112,19 +120,31 @@ export async function broadcastResult(
     return "empty";
   }
 
+  const titleDate = opts?.titleDate ?? new Date();
+  const dateString = getLocalTimeParts(target.timezone, titleDate).dateString;
   const { description, truncated } = truncateEmbedDescription(result.markdown);
 
   const embed: DiscordEmbed = {
-    title: `📊 Daily Standup Summary - ${formatDateInTimezone(target.timezone, opts?.titleDate ?? new Date())}`,
+    title: `📊 Daily Standup Summary - ${formatDateInTimezone(target.timezone, titleDate)}`,
     description,
     color: EMBED_COLOR,
   };
 
   if (truncated) {
-    embed.footer = { text: "Summary truncated due to Discord embed limits." };
+    embed.footer = {
+      text: "Embed truncated — full summary attached as .md file.",
+    };
   }
 
-  await postChannelMessage(config, target.channelId, { embeds: [embed] });
+  await postChannelMessage(
+    config,
+    target.channelId,
+    { embeds: [embed] },
+    {
+      filename: `standup-summary-${dateString}.md`,
+      content: result.markdown,
+    },
+  );
   return "summary";
 }
 
@@ -148,13 +168,28 @@ async function postChannelMessage(
   config: AppConfig,
   channelId: string,
   body: ChannelMessageBody,
+  attachment?: MessageAttachment,
 ): Promise<void> {
-  await discordJson(
-    config.discordBotToken,
-    `/channels/${channelId}/messages`,
-    {
+  const path = `/channels/${channelId}/messages`;
+
+  if (!attachment) {
+    await discordJson(config.discordBotToken, path, {
       method: "POST",
       body: JSON.stringify(body),
-    },
+    });
+    return;
+  }
+
+  const form = new FormData();
+  form.append("payload_json", JSON.stringify(body));
+  form.append(
+    "files[0]",
+    new Blob([attachment.content], { type: "text/markdown; charset=utf-8" }),
+    attachment.filename,
   );
+
+  await discordJson(config.discordBotToken, path, {
+    method: "POST",
+    body: form,
+  });
 }

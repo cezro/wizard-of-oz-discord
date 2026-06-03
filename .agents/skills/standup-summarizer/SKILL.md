@@ -30,7 +30,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
    - `### Active Focus Areas`
    - `### Blockers & Dependencies`
 6. **Attribution:** Every bullet keeps Discord mentions (`<@userId>`) as ingested.
-7. **Egress:** Bot API only; rich embed title `📊 Daily Standup Summary - [date]`.
+7. **Egress:** Bot API only; rich embed title `📊 Daily Standup Summary - [date]`; attach full markdown as `standup-summary-YYYY-MM-DD.md` on every summary post.
 8. **Cron security:** `Authorization: Bearer ${CRON_SECRET}` on `POST /cron/standup`.
 9. **Channel config:** Per-server via Supabase only (`/standup-config set`); cron loads all enabled rows.
 10. **Missing DSM nudge:** Same rolling 24h ingestion window as cron summary; compares role members (`GET /guilds/{id}/members`) to message `authorId`s; cron marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.

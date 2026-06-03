@@ -77,12 +77,14 @@ export async function discordFetch(
 ): Promise<Response> {
   const url = path.startsWith("http") ? path : `${DISCORD_API_BASE}${path}`;
 
+  const isMultipart = init?.body instanceof FormData;
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetch(url, {
       ...init,
       headers: {
         Authorization: `Bot ${token}`,
-        "Content-Type": "application/json",
+        ...(isMultipart ? {} : { "Content-Type": "application/json" }),
         ...init?.headers,
       },
     });

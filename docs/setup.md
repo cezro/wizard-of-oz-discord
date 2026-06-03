@@ -44,7 +44,8 @@ The primary objective is to eliminate manual oversight and provide an automated,
 - **Delivery Mechanism:** Execute a POST request via the Discord Bot API or an Incoming Webhook to the source channel.
 - **Presentation:** Wrap the synthesized response in a **Discord Rich Embed** object for a clean, professional UI rather than unformatted raw body text.
   - _Embed Title:_ `📊 Daily Standup Summary - [Current Date]`
-  - _Embed Description/Fields:_ Contain the structured markdown output from Gemini.
+  - _Embed Description/Fields:_ Contain the structured markdown output from Gemini (truncated at Discord’s 4096-character embed limit when necessary).
+  - _Attachment:_ Every summary message includes a downloadable `standup-summary-YYYY-MM-DD.md` file with the full markdown text.
 
 ---
 
