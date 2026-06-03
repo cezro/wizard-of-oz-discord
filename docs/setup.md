@@ -13,7 +13,7 @@ The primary objective is to eliminate manual oversight and provide an automated,
 ### A. Scheduling & Triggering (Ingress)
 
 - **Cadence:** A Render cron job hits `POST /cron/standup` **every minute, Monday through Friday**. Each enabled guild has its own reminder and summary times stored in Supabase (default summary: 17:00 in the guild timezone). The tick fires at most once per guild per calendar day for each action.
-- **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM.
+- **Reminder:** At the configured reminder time, the bot posts a channel message prompting the team to post their async DSM. When a reporter role is configured (`/standup-config set-reporter-role`), the reminder @-mentions every non-bot member with that role (same `allowed_mentions` pattern as the missing DSM nudge; requires **Server Members Intent**). If no reporter role is set, the reminder is text-only.
 - **Missing DSM nudge:** At the configured nudge time (defaults to summary time if not set), the bot mentions members who have the configured reporter role but have not posted a **valid** DSM check-in in the standup channel within the rolling 24-hour window. Requires **Server Members Intent** in the Discord Developer Portal.
 - **Summary:** At the configured summary time, the bot runs the ingest → Gemini → embed pipeline for that guild.
 - **Security:** The cron route requires `Authorization: Bearer <CRON_SECRET>` to prevent webhook spam.

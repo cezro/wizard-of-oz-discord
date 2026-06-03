@@ -87,10 +87,27 @@ const MAX_ALLOWED_USER_MENTIONS = 100;
 export async function broadcastReminder(
   config: AppConfig,
   channelId: string,
+  reporterUserIds: string[] = [],
 ): Promise<void> {
-  await postChannelMessage(config, channelId, {
-    content: REMINDER_MESSAGE,
-  });
+  if (reporterUserIds.length === 0) {
+    await postChannelMessage(config, channelId, {
+      content: REMINDER_MESSAGE,
+    });
+    return;
+  }
+
+  const chunks = chunkMentionMessages(reporterUserIds, (isFirstChunk) =>
+    isFirstChunk ? `${REMINDER_MESSAGE}\n\n` : null,
+  );
+  for (const chunk of chunks) {
+    await postChannelMessage(config, channelId, {
+      content: chunk.content,
+      allowed_mentions: {
+        parse: [],
+        users: chunk.userIds,
+      },
+    });
+  }
 }
 
 export async function broadcastMissingReporterNudge(
@@ -98,7 +115,7 @@ export async function broadcastMissingReporterNudge(
   channelId: string,
   missingUserIds: string[],
 ): Promise<void> {
-  const chunks = chunkMentionMessages(missingUserIds);
+  const chunks = chunkMentionMessages(missingUserIds, () => MISSING_NUDGE_PREFIX);
   for (const chunk of chunks) {
     await postChannelMessage(config, channelId, {
       content: chunk.content,
@@ -112,13 +129,15 @@ export async function broadcastMissingReporterNudge(
 
 function chunkMentionMessages(
   userIds: string[],
+  getPrefix: (isFirstChunk: boolean) => string | null,
 ): { content: string; userIds: string[] }[] {
   const messages: { content: string; userIds: string[] }[] = [];
   let currentIds: string[] = [];
+  let isFirstChunk = true;
 
   for (const id of userIds) {
     const candidateIds = [...currentIds, id];
-    const content = buildMissingNudgeContent(candidateIds);
+    const content = buildMentionChunkContent(getPrefix(isFirstChunk), candidateIds);
     const overCharLimit =
       content.length > DISCORD_CONTENT_LIMIT && currentIds.length > 0;
     const overMentionLimit =
@@ -126,9 +145,10 @@ function chunkMentionMessages(
 
     if (overCharLimit || overMentionLimit) {
       messages.push({
-        content: buildMissingNudgeContent(currentIds),
+        content: buildMentionChunkContent(getPrefix(isFirstChunk), currentIds),
         userIds: [...currentIds],
       });
+      isFirstChunk = false;
       currentIds = [id];
     } else {
       currentIds = candidateIds;
@@ -137,7 +157,7 @@ function chunkMentionMessages(
 
   if (currentIds.length > 0) {
     messages.push({
-      content: buildMissingNudgeContent(currentIds),
+      content: buildMentionChunkContent(getPrefix(isFirstChunk), currentIds),
       userIds: [...currentIds],
     });
   }
@@ -145,9 +165,13 @@ function chunkMentionMessages(
   return messages;
 }
 
-function buildMissingNudgeContent(userIds: string[]): string {
+function buildMentionChunkContent(
+  prefix: string | null,
+  userIds: string[],
+): string {
   const mentions = userIds.map((id) => `<@${id}>`).join(" ");
-  return MISSING_NUDGE_PREFIX + mentions;
+  if (prefix === null) return mentions;
+  return prefix + mentions;
 }
 
 export async function broadcastResult(

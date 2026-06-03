@@ -46,6 +46,7 @@ src/
   commands/standup.ts         # summarize + remind-missing handlers
   commands/standup-config.ts  # channel, schedule, and role config handlers
   cron/standup-tick.ts        # reminder, nudge, summary tick
+  standup/reminder.ts         # daily DSM reminder + reporter pings
   standup/missing-reporters.ts
   discord/guild-members.ts    # paginated member list, filter by role
   discord/gateway.ts          # GUILDS | GUILD_MEMBERS intents

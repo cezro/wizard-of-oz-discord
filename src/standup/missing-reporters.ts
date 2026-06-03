@@ -68,7 +68,7 @@ export async function runMissingReporterNudge(
   };
 }
 
-async function getExpectedReporterIds(
+export async function getExpectedReporterIds(
   config: AppConfig,
   guildId: string,
   roleId: string,

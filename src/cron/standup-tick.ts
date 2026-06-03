@@ -1,7 +1,7 @@
 import type { AppConfig } from "../config.js";
-import { broadcastReminder } from "../egress/discord.js";
 import { runPipeline } from "../pipeline.js";
 import { runMissingReporterNudge } from "../standup/missing-reporters.js";
+import { runDailyReminder } from "../standup/reminder.js";
 import {
   getEnabledConfigs,
   markNudgeSent,
@@ -66,7 +66,7 @@ async function processGuildTick(
       ) &&
       target.lastReminderDate !== local.dateString
     ) {
-      await broadcastReminder(config, target.channelId);
+      await runDailyReminder(config, target);
       await markReminderSent(config, target.guildId, local.dateString);
       result.reminderSent = true;
     }
