@@ -4,7 +4,11 @@ import { broadcastResult } from "./egress/discord.js";
 import { ingestStandupMessages } from "./ingestion/discord.js";
 import { processStandup } from "./processing/gemini.js";
 import type { PipelineResult, StandupTarget } from "./types.js";
-import { getStandupWindow } from "./utils/timezone.js";
+import {
+  dateStringToReferenceDate,
+  getStandupWindow,
+  type StandupWindow,
+} from "./utils/timezone.js";
 
 export interface GuildPipelineResult extends PipelineResult {
   guildId: string;
@@ -15,14 +19,24 @@ export interface AllPipelinesResult {
   results: GuildPipelineResult[];
 }
 
+export interface RunPipelineOptions {
+  window?: StandupWindow;
+  /** YYYY-MM-DD for embed title when summarizing a chosen calendar day */
+  summaryDate?: string;
+}
+
 export async function runPipeline(
   config: AppConfig,
   target: StandupTarget,
+  options?: RunPipelineOptions,
 ): Promise<GuildPipelineResult> {
-  const window = getStandupWindow(target.timezone);
+  const window = options?.window ?? getStandupWindow(target.timezone);
   const data = await ingestStandupMessages(config, target, window);
   const processed = await processStandup(config, data);
-  const posted = await broadcastResult(config, target, processed);
+  const titleDate = options?.summaryDate
+    ? dateStringToReferenceDate(target.timezone, options.summaryDate)
+    : undefined;
+  const posted = await broadcastResult(config, target, processed, { titleDate });
 
   return {
     guildId: target.guildId,

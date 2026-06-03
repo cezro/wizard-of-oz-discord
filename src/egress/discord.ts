@@ -9,6 +9,9 @@ const EMPTY_DAY_MESSAGE =
   "No standup updates recorded for today! Hope everyone had a productive day.";
 const REMINDER_MESSAGE =
   "**Daily Standup Reminder** — Please post your async DSM update in this channel.";
+const MISSING_NUDGE_PREFIX =
+  "**End of Day DSM Reminder** — Please post your async DSM update. Still waiting on: ";
+const DISCORD_CONTENT_LIMIT = 2000;
 
 interface DiscordEmbed {
   title: string;
@@ -26,10 +29,45 @@ export async function broadcastReminder(
   });
 }
 
+export async function broadcastMissingReporterNudge(
+  config: AppConfig,
+  channelId: string,
+  missingUserIds: string[],
+): Promise<void> {
+  const chunks = chunkMentionMessages(missingUserIds);
+  for (const content of chunks) {
+    await postChannelMessage(config, channelId, { content });
+  }
+}
+
+function chunkMentionMessages(userIds: string[]): string[] {
+  const mentions = userIds.map((id) => `<@${id}>`);
+  const messages: string[] = [];
+  let currentMentions: string[] = [];
+
+  for (const mention of mentions) {
+    const candidate = [...currentMentions, mention];
+    const content = MISSING_NUDGE_PREFIX + candidate.join(" ");
+    if (content.length > DISCORD_CONTENT_LIMIT && currentMentions.length > 0) {
+      messages.push(MISSING_NUDGE_PREFIX + currentMentions.join(" "));
+      currentMentions = [mention];
+    } else {
+      currentMentions = candidate;
+    }
+  }
+
+  if (currentMentions.length > 0) {
+    messages.push(MISSING_NUDGE_PREFIX + currentMentions.join(" "));
+  }
+
+  return messages;
+}
+
 export async function broadcastResult(
   config: AppConfig,
   target: StandupTarget,
   result: ProcessResult,
+  opts?: { titleDate?: Date },
 ): Promise<"empty" | "summary"> {
   if (result.kind === "empty") {
     await postChannelMessage(config, target.channelId, {
@@ -41,7 +79,7 @@ export async function broadcastResult(
   const { description, truncated } = truncateEmbedDescription(result.markdown);
 
   const embed: DiscordEmbed = {
-    title: `📊 Daily Standup Summary - ${formatDateInTimezone(target.timezone)}`,
+    title: `📊 Daily Standup Summary - ${formatDateInTimezone(target.timezone, opts?.titleDate ?? new Date())}`,
     description,
     color: EMBED_COLOR,
   };

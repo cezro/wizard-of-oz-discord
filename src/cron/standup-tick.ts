@@ -1,8 +1,10 @@
 import type { AppConfig } from "../config.js";
 import { broadcastReminder } from "../egress/discord.js";
 import { runPipeline } from "../pipeline.js";
+import { runMissingReporterNudge } from "../standup/missing-reporters.js";
 import {
   getEnabledConfigs,
+  markNudgeSent,
   markReminderSent,
   markSummarySent,
 } from "../storage/config-store.js";
@@ -10,11 +12,13 @@ import type { StandupTarget } from "../types.js";
 import {
   getLocalTimeParts,
   matchesSchedule,
+  resolveNudgeSchedule,
 } from "../utils/timezone.js";
 
 export interface GuildTickResult {
   guildId: string;
   reminderSent: boolean;
+  nudgeSent: boolean;
   summaryRan: boolean;
   error?: string;
 }
@@ -45,6 +49,7 @@ async function processGuildTick(
   const result: GuildTickResult = {
     guildId: target.guildId,
     reminderSent: false,
+    nudgeSent: false,
     summaryRan: false,
   };
 
@@ -64,6 +69,22 @@ async function processGuildTick(
       await broadcastReminder(config, target.channelId);
       await markReminderSent(config, target.guildId, local.dateString);
       result.reminderSent = true;
+    }
+
+    const nudgeSchedule = resolveNudgeSchedule(target);
+    if (
+      target.reporterRoleId &&
+      matchesSchedule(
+        local.hour,
+        local.minute,
+        nudgeSchedule.hour,
+        nudgeSchedule.minute,
+      ) &&
+      target.lastNudgeDate !== local.dateString
+    ) {
+      const nudgeResult = await runMissingReporterNudge(config, target);
+      await markNudgeSent(config, target.guildId, local.dateString);
+      result.nudgeSent = nudgeResult.posted;
     }
 
     if (

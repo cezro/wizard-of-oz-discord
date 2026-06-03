@@ -95,3 +95,135 @@ export function matchesSchedule(
 export function formatScheduleTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
+
+/** Nudge time; null nudge_hour falls back to summary_hour. */
+export function resolveNudgeSchedule(target: {
+  nudgeHour: number | null;
+  nudgeMinute: number;
+  summaryHour: number;
+}): { hour: number; minute: number } {
+  return {
+    hour: target.nudgeHour ?? target.summaryHour,
+    minute: target.nudgeMinute,
+  };
+}
+
+const DATE_STRING_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export interface ResolvedSummarizeDate {
+  dateString: string;
+  usedFallback: boolean;
+}
+
+/** Validates YYYY-MM-DD and that it is a real calendar date. */
+export function isValidDateString(s: string): boolean {
+  if (!DATE_STRING_RE.test(s)) return false;
+  const [year, month, day] = s.split("-").map(Number);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  return (
+    utc.getUTCFullYear() === year &&
+    utc.getUTCMonth() === month - 1 &&
+    utc.getUTCDate() === day
+  );
+}
+
+/** Resolves summarize date: option, else today; invalid option falls back to today. */
+export function resolveSummarizeDate(
+  timezone: string,
+  dateOption?: string,
+  now: Date = new Date(),
+): ResolvedSummarizeDate {
+  validateTimezone(timezone);
+  const today = getLocalTimeParts(timezone, now).dateString;
+
+  if (!dateOption?.trim()) {
+    return { dateString: today, usedFallback: false };
+  }
+
+  const trimmed = dateOption.trim();
+  if (isValidDateString(trimmed)) {
+    return { dateString: trimmed, usedFallback: false };
+  }
+
+  return { dateString: today, usedFallback: true };
+}
+
+/** Inclusive calendar-day window in the given IANA timezone. */
+export function getCalendarDayWindow(
+  timezone: string,
+  dateString: string,
+): StandupWindow {
+  validateTimezone(timezone);
+  if (!isValidDateString(dateString)) {
+    throw new Error(`Invalid date string: ${dateString}`);
+  }
+
+  return {
+    windowStart: zonedLocalTimeToUtc(timezone, dateString, 0, 0, 0, 0),
+    windowEnd: zonedLocalTimeToUtc(timezone, dateString, 23, 59, 59, 999),
+  };
+}
+
+/** Reference instant for embed titles (local noon on that day). */
+export function dateStringToReferenceDate(
+  timezone: string,
+  dateString: string,
+): Date {
+  validateTimezone(timezone);
+  if (!isValidDateString(dateString)) {
+    throw new Error(`Invalid date string: ${dateString}`);
+  }
+  return zonedLocalTimeToUtc(timezone, dateString, 12, 0, 0, 0);
+}
+
+function zonedLocalTimeToUtc(
+  timeZone: string,
+  dateString: string,
+  hour: number,
+  minute: number,
+  second: number,
+  ms: number,
+): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  let utc = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+
+  for (let i = 0; i < 3; i++) {
+    const offset = getTimezoneOffsetMs(timeZone, new Date(utc));
+    const corrected = Date.UTC(year, month - 1, day, hour, minute, second, ms) - offset;
+    if (corrected === utc) break;
+    utc = corrected;
+  }
+
+  return new Date(utc);
+}
+
+function getTimezoneOffsetMs(timeZone: string, date: Date): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date).map((p) => [p.type, p.value]),
+  );
+
+  let hour = parseInt(parts.hour ?? "0", 10);
+  if (hour === 24) hour = 0;
+
+  const asUtc = Date.UTC(
+    parseInt(parts.year ?? "0", 10),
+    parseInt(parts.month ?? "1", 10) - 1,
+    parseInt(parts.day ?? "1", 10),
+    hour,
+    parseInt(parts.minute ?? "0", 10),
+    parseInt(parts.second ?? "0", 10),
+  );
+
+  return asUtc - date.getTime();
+}

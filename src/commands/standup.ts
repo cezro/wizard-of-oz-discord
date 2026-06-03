@@ -1,21 +1,114 @@
 import type { AppConfig } from "../config.js";
+import { editDeferredInteraction } from "../discord/interaction-followup.js";
 import {
+  deferredEphemeral,
   ephemeral,
   getSubcommand,
   getSubcommandIntegerOption,
+  getSubcommandOption,
   getUserId,
   requireGuild,
   type DiscordInteraction,
   type InteractionResponse,
 } from "../discord/interaction-utils.js";
 import { requireManageGuild } from "../discord/permissions.js";
-import { runPipeline } from "../pipeline.js";
+import { runPipeline, type RunPipelineOptions } from "../pipeline.js";
+import { runMissingReporterNudge } from "../standup/missing-reporters.js";
 import {
   configRowToTarget,
   getConfig,
+  updateReporterRole,
   updateSchedule,
 } from "../storage/config-store.js";
-import { formatScheduleTime } from "../utils/timezone.js";
+import type { StandupTarget } from "../types.js";
+import {
+  formatScheduleTime,
+  getCalendarDayWindow,
+  resolveNudgeSchedule,
+  resolveSummarizeDate,
+} from "../utils/timezone.js";
+
+async function runSummarizeAndFollowUp(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  target: StandupTarget,
+  timezone: string,
+  pipelineOptions: RunPipelineOptions,
+  usedFallback: boolean,
+): Promise<void> {
+  try {
+    const result = await runPipeline(config, target, pipelineOptions);
+    const lines = [
+      "Summary pipeline completed.",
+      `**Date:** ${pipelineOptions.summaryDate} (\`${timezone}\`)`,
+      `**Messages ingested:** ${result.messageCount}`,
+      `**Posted:** ${result.posted}`,
+      `**Channel:** <#${result.channelId}>`,
+    ];
+    if (usedFallback) {
+      lines.push("_Invalid `date` option; summarized today instead._");
+    }
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      lines.join("\n"),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Something went wrong.";
+    await editDeferredInteraction(applicationId, interactionToken, message);
+  }
+}
+
+async function runRemindMissingAndFollowUp(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  target: StandupTarget,
+): Promise<void> {
+  try {
+    const result = await runMissingReporterNudge(config, target);
+    if (!result.posted) {
+      await editDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "Everyone with the reporter role has posted their DSM in the rolling 24-hour window.",
+      );
+      return;
+    }
+
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      [
+        "Missing DSM reminder posted.",
+        `**Mentioned:** ${result.missingCount} member(s)`,
+        `**Expected reporters:** ${result.expectedCount}`,
+        `**Channel:** <#${target.channelId}>`,
+      ].join("\n"),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Something went wrong.";
+    await editDeferredInteraction(applicationId, interactionToken, message);
+  }
+}
+
+function formatNudgeSchedule(row: {
+  nudge_hour: number | null;
+  nudge_minute: number;
+  summary_hour: number;
+  summary_minute: number;
+  timezone: string;
+}): string {
+  if (row.nudge_hour === null) {
+    const summaryTime = formatScheduleTime(row.summary_hour, row.summary_minute);
+    return `same as summary (**${summaryTime}** \`${row.timezone}\`)`;
+  }
+  const time = formatScheduleTime(row.nudge_hour, row.nudge_minute);
+  return `**${time}** (\`${row.timezone}\`)`;
+}
 
 function validateHourMinute(
   hour: number | undefined,
@@ -101,17 +194,103 @@ export async function handleStandupCommand(
             ? "disabled"
             : `${formatScheduleTime(row.reminder_hour, row.reminder_minute)} (\`${row.timezone}\`)`;
         const summary = `${formatScheduleTime(row.summary_hour, row.summary_minute)} (\`${row.timezone}\`)`;
+        const nudge = formatNudgeSchedule(row);
+        const reporterRole = row.reporter_role_id
+          ? `<@&${row.reporter_role_id}>`
+          : "not set";
 
         return ephemeral(
           [
             `**Channel:** <#${row.channel_id}>`,
             `**Timezone:** \`${row.timezone}\``,
+            `**Reporter role:** ${reporterRole}`,
             `**Reminder:** ${reminder}`,
+            `**Missing DSM nudge:** ${nudge}`,
             `**Summary:** ${summary}`,
             `**Last reminder:** ${row.last_reminder_date ?? "never"}`,
+            `**Last nudge:** ${row.last_nudge_date ?? "never"}`,
             `**Last summary:** ${row.last_summary_date ?? "never"}`,
           ].join("\n"),
         );
+      }
+
+      case "set-reporter-role": {
+        const roleId = getSubcommandOption(interaction, "role");
+        if (!roleId) return ephemeral("Role is required.");
+
+        const row = await updateReporterRole(config, guildId, {
+          reporterRoleId: roleId,
+          updatedBy: userId,
+        });
+
+        return ephemeral(
+          `Reporter role set to <@&${row.reporter_role_id}> in <#${row.channel_id}>.`,
+        );
+      }
+
+      case "set-nudge-time": {
+        const hour = getSubcommandIntegerOption(interaction, "hour");
+        const minute = getSubcommandIntegerOption(interaction, "minute");
+        const validationError = validateHourMinute(hour, minute);
+        if (validationError) return ephemeral(validationError);
+
+        const row = await updateSchedule(config, guildId, {
+          nudgeHour: hour!,
+          nudgeMinute: minute ?? 0,
+          updatedBy: userId,
+        });
+
+        const time = formatScheduleTime(row.nudge_hour!, row.nudge_minute);
+        return ephemeral(
+          `Missing DSM nudge scheduled for **${time}** (\`${row.timezone}\`).`,
+        );
+      }
+
+      case "clear-nudge-time": {
+        const row = await updateSchedule(config, guildId, {
+          nudgeHour: null,
+          updatedBy: userId,
+        });
+
+        const target = configRowToTarget(row);
+        const resolved = resolveNudgeSchedule(target);
+        const time = formatScheduleTime(resolved.hour, resolved.minute);
+        return ephemeral(
+          `Missing DSM nudge will use the summary time (**${time}** \`${row.timezone}\`).`,
+        );
+      }
+
+      case "remind-missing": {
+        const row = await getConfig(config, guildId);
+        if (!row) {
+          return ephemeral(
+            "No configuration yet. Run `/standup-config set` first.",
+          );
+        }
+
+        if (!row.reporter_role_id) {
+          return ephemeral(
+            "No reporter role configured. Run `/standup set-reporter-role` first.",
+          );
+        }
+
+        const token = interaction.token;
+        if (!token) {
+          return ephemeral("Missing interaction token; try again.");
+        }
+
+        const applicationId =
+          interaction.application_id ?? config.discordApplicationId;
+        const target = configRowToTarget(row);
+
+        void runRemindMissingAndFollowUp(
+          config,
+          applicationId,
+          token,
+          target,
+        );
+
+        return deferredEphemeral();
       }
 
       case "summarize": {
@@ -122,17 +301,33 @@ export async function handleStandupCommand(
           );
         }
 
-        const target = configRowToTarget(row);
-        const result = await runPipeline(config, target);
+        const token = interaction.token;
+        if (!token) {
+          return ephemeral("Missing interaction token; try again.");
+        }
 
-        return ephemeral(
-          [
-            "Summary pipeline completed.",
-            `**Messages ingested:** ${result.messageCount}`,
-            `**Posted:** ${result.posted}`,
-            `**Channel:** <#${result.channelId}>`,
-          ].join("\n"),
+        const applicationId =
+          interaction.application_id ?? config.discordApplicationId;
+        const target = configRowToTarget(row);
+
+        const dateOption = getSubcommandOption(interaction, "date");
+        const { dateString, usedFallback } = resolveSummarizeDate(
+          row.timezone,
+          dateOption,
         );
+        const window = getCalendarDayWindow(row.timezone, dateString);
+
+        void runSummarizeAndFollowUp(
+          config,
+          applicationId,
+          token,
+          target,
+          row.timezone,
+          { window, summaryDate: dateString },
+          usedFallback,
+        );
+
+        return deferredEphemeral();
       }
 
       default:

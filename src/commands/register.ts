@@ -89,6 +89,46 @@ const STANDUP_COMMAND = {
       type: 1,
       name: "summarize",
       description: "Force-run the summary pipeline now for this server",
+      options: [
+        {
+          type: 3,
+          name: "date",
+          description:
+            "Day to summarize (YYYY-MM-DD, guild timezone). Defaults to today.",
+          required: false,
+        },
+      ],
+    },
+    {
+      type: 1,
+      name: "set-reporter-role",
+      description: "Set the role whose members must post a daily DSM",
+      options: [
+        {
+          type: 8,
+          name: "role",
+          description: "Members with this role are expected to report",
+          required: true,
+        },
+      ],
+    },
+    {
+      type: 1,
+      name: "set-nudge-time",
+      description:
+        "Set when to remind members who have not posted (defaults to summary time)",
+      options: [HOUR_OPTION, MINUTE_OPTION],
+    },
+    {
+      type: 1,
+      name: "clear-nudge-time",
+      description: "Use the summary time for missing-DSM reminders",
+    },
+    {
+      type: 1,
+      name: "remind-missing",
+      description:
+        "Remind members with the reporter role who have not posted today",
     },
   ],
 };

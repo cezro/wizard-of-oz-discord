@@ -14,6 +14,13 @@ export interface UpdateScheduleInput {
   reminderMinute?: number;
   summaryHour?: number;
   summaryMinute?: number;
+  nudgeHour?: number | null;
+  nudgeMinute?: number;
+  updatedBy: string;
+}
+
+export interface UpdateReporterRoleInput {
+  reporterRoleId: string | null;
   updatedBy: string;
 }
 
@@ -28,6 +35,10 @@ function rowToTarget(row: StandupConfigRow): StandupTarget {
     summaryMinute: row.summary_minute,
     lastReminderDate: row.last_reminder_date,
     lastSummaryDate: row.last_summary_date,
+    reporterRoleId: row.reporter_role_id,
+    nudgeHour: row.nudge_hour,
+    nudgeMinute: row.nudge_minute,
+    lastNudgeDate: row.last_nudge_date,
   };
 }
 
@@ -138,6 +149,8 @@ export async function updateSchedule(
   if (input.summaryMinute !== undefined) {
     patch.summary_minute = input.summaryMinute;
   }
+  if (input.nudgeHour !== undefined) patch.nudge_hour = input.nudgeHour;
+  if (input.nudgeMinute !== undefined) patch.nudge_minute = input.nudgeMinute;
 
   const supabase = getSupabase(config);
   const { data, error } = await supabase
@@ -180,6 +193,50 @@ export async function markSummarySent(
 
   if (error) {
     throw new Error(`Failed to mark summary sent: ${error.message}`);
+  }
+}
+
+export async function updateReporterRole(
+  config: AppConfig,
+  guildId: string,
+  input: UpdateReporterRoleInput,
+): Promise<StandupConfigRow> {
+  const existing = await getConfig(config, guildId);
+  if (!existing) {
+    throw new Error(
+      "No configuration found for this server. Run /standup-config set first.",
+    );
+  }
+
+  const supabase = getSupabase(config);
+  const { data, error } = await supabase
+    .from("standup_config")
+    .update({
+      reporter_role_id: input.reporterRoleId,
+      updated_by: input.updatedBy,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("guild_id", guildId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update reporter role: ${error.message}`);
+  return data;
+}
+
+export async function markNudgeSent(
+  config: AppConfig,
+  guildId: string,
+  dateString: string,
+): Promise<void> {
+  const supabase = getSupabase(config);
+  const { error } = await supabase
+    .from("standup_config")
+    .update({ last_nudge_date: dateString })
+    .eq("guild_id", guildId);
+
+  if (error) {
+    throw new Error(`Failed to mark nudge sent: ${error.message}`);
   }
 }
 

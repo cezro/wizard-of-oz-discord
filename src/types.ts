@@ -8,6 +8,10 @@ export interface StandupTarget {
   summaryMinute: number;
   lastReminderDate: string | null;
   lastSummaryDate: string | null;
+  reporterRoleId: string | null;
+  nudgeHour: number | null;
+  nudgeMinute: number;
+  lastNudgeDate: string | null;
 }
 
 export interface SanitizedMessage {

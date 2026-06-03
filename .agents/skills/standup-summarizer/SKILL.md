@@ -5,7 +5,7 @@ description: >-
   /standup-config slash commands backed by Supabase.
   Use when working on the standup pipeline, cron endpoint, interactions, or
   docs/setup.md behavior.
-version: "1.1.0"
+version: "1.2.0"
 ---
 
 # Standup Summarizer
@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion.
+1. **Schedule:** Mon–Fri end-of-day 17:00 Asia/Manila; **cron** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `date`, default today).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts.
 4. **Order:** Oldest → newest before Gemini.
@@ -33,6 +33,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 7. **Egress:** Bot API only; rich embed title `📊 Daily Standup Summary - [date]`.
 8. **Cron security:** `Authorization: Bearer ${CRON_SECRET}` on `POST /cron/standup`.
 9. **Channel config:** Per-server via Supabase only (`/standup-config set`); cron loads all enabled rows.
+10. **Missing DSM nudge:** Same rolling 24h ingestion window as cron summary; compares role members (`GET /guilds/{id}/members`) to message `authorId`s; cron marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.
 
 ## File map
 
@@ -42,13 +43,19 @@ src/
   config.ts                   # env + resolveStandupTargets()
   storage/config-store.ts     # Supabase CRUD
   commands/register.ts        # slash command registration
+  commands/standup.ts         # schedule + nudge slash handlers
   commands/standup-config.ts  # slash handlers
+  cron/standup-tick.ts        # reminder, nudge, summary tick
+  standup/missing-reporters.ts
+  discord/guild-members.ts    # paginated member list, filter by role
+  discord/gateway.ts          # GUILDS | GUILD_MEMBERS intents
   discord/verify.ts           # interaction signatures
   pipeline.ts                 # runPipeline / runAllPipelines
   ingestion/discord.ts
   processing/gemini.ts, prompts.ts
   egress/discord.ts
 supabase/migrations/001_standup_config.sql
+supabase/migrations/003_standup_reporter_role.sql
 ```
 
 ## Defaults

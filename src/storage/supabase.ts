@@ -16,6 +16,10 @@ export interface StandupConfigRow {
   summary_minute: number;
   last_reminder_date: string | null;
   last_summary_date: string | null;
+  reporter_role_id: string | null;
+  nudge_hour: number | null;
+  nudge_minute: number;
+  last_nudge_date: string | null;
 }
 
 let client: SupabaseClient | null = null;

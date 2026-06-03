@@ -7,6 +7,8 @@ interface InteractionOption {
 
 export interface DiscordInteraction {
   type: number;
+  token?: string;
+  application_id?: string;
   data?: {
     name: string;
     options?: InteractionOption[];
@@ -23,11 +25,20 @@ type InteractionResponse = Record<string, unknown>;
 
 const EPHEMERAL = 64;
 const RESPONSE_MESSAGE = 4;
+const RESPONSE_DEFERRED_MESSAGE = 5;
 
 export function ephemeral(content: string): InteractionResponse {
   return {
     type: RESPONSE_MESSAGE,
     data: { content, flags: EPHEMERAL },
+  };
+}
+
+/** Acknowledge immediately; follow up via interaction webhook (15 min window). */
+export function deferredEphemeral(): InteractionResponse {
+  return {
+    type: RESPONSE_DEFERRED_MESSAGE,
+    data: { flags: EPHEMERAL },
   };
 }
 

@@ -2,6 +2,8 @@ import WebSocket from "ws";
 
 const GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 const GUILDS_INTENT = 1 << 0;
+const GUILD_MEMBERS_INTENT = 1 << 1;
+const GATEWAY_INTENTS = GUILDS_INTENT | GUILD_MEMBERS_INTENT;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
 const Opcodes = {
@@ -57,7 +59,7 @@ export function startDiscordGateway(token: string): () => void {
       op: Opcodes.Identify,
       d: {
         token,
-        intents: GUILDS_INTENT,
+        intents: GATEWAY_INTENTS,
         properties: {
           os: process.platform,
           browser: "wizard-of-oz-discord",
