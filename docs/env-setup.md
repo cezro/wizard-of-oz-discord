@@ -209,6 +209,27 @@ curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
 
 ---
 
+## Production deployment (Render)
+
+| Item | Value |
+|------|-------|
+| Health | `https://standup-summarizer.onrender.com/health` |
+| Interactions Endpoint URL | `https://standup-summarizer.onrender.com/discord/interactions` |
+| Cron | `POST https://standup-summarizer.onrender.com/cron/standup` with `Authorization: Bearer <CRON_SECRET>` |
+| Cron schedule | `0 9 * * 1-5` UTC (= 17:00 Asia/Manila, Mon–Fri) |
+
+**Developer Portal — set Interactions Endpoint URL now** (General Information → paste URL above → Save Changes). Discord sends a signed PING; Render must be awake (hit `/health` first on free tier). Until this is saved, `/standup-config` will not respond in Discord.
+
+**Invite URL** (OAuth2 → URL Generator, or open directly with your Application ID):
+
+```
+https://discord.com/api/oauth2/authorize?client_id=YOUR_APPLICATION_ID&permissions=84992&scope=bot%20applications.commands
+```
+
+Permissions `84992` = View Channel, Read Message History, Send Messages, Embed Links.
+
+---
+
 ## Quick checklist
 
 | Step | Action |
