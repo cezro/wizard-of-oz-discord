@@ -17,6 +17,40 @@ export class DiscordApiError extends Error {
   }
 }
 
+interface DiscordErrorBody {
+  code?: number;
+  message?: string;
+}
+
+/** Maps common Discord API failures to actionable text for slash-command replies. */
+export function formatUserFacingDiscordError(error: unknown): string {
+  if (error instanceof DiscordApiError) {
+    if (error.status === 403) {
+      const body = error.body as DiscordErrorBody | undefined;
+      const codeSuffix =
+        body?.code !== undefined ? ` (Discord code ${body.code})` : "";
+      return [
+        `Discord denied access when listing server members${codeSuffix}.`,
+        "",
+        "Enable **Server Members Intent**:",
+        "1. Open the [Discord Developer Portal](https://discord.com/developers/applications)",
+        "2. Select this bot → **Bot** → **Privileged Gateway Intents**",
+        "3. Turn on **Server Members Intent** and save",
+        "4. Restart the bot (redeploy on Render or restart `npm run dev`)",
+        "",
+        "Then run `/standup remind-missing` again.",
+      ].join("\n");
+    }
+    const body = error.body as DiscordErrorBody | undefined;
+    if (body?.message) {
+      return `Discord API error: ${body.message}`;
+    }
+  }
+
+  if (error instanceof Error) return error.message;
+  return "Something went wrong.";
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

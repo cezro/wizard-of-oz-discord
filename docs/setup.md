@@ -88,9 +88,15 @@ See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the c
 | `/standup clear-nudge-time` | Use the summary time for missing-DSM reminders |
 | `/standup remind-missing` | Force-remind members with the reporter role who have not posted |
 
-### Discord bot intents
+### Discord bot intents (required for missing-DSM nudges)
 
-Enable **Server Members Intent** under Bot → Privileged Gateway Intents in the [Discord Developer Portal](https://discord.com/developers/applications). The bot declares `GUILDS` and `GUILD_MEMBERS` on the gateway connection so it can list guild members and filter by reporter role. Do not assign `@everyone` as the reporter role.
+`/standup remind-missing` and the scheduled nudge call `GET /guilds/{id}/members`. Discord returns **403 Forbidden** if this is not set up.
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications) → your application → **Bot**.
+2. Under **Privileged Gateway Intents**, enable **Server Members Intent** and save.
+3. Restart or redeploy the bot so the gateway reconnects with `GUILDS` + `GUILD_MEMBERS` intents.
+
+Do not assign `@everyone` as the reporter role (members often omit that role id from their `roles` array).
 
 Run `supabase/migrations/001_standup_config.sql`, `002_standup_schedule.sql`, and `003_standup_reporter_role.sql` in Supabase before using schedule and nudge commands.
 

@@ -21,6 +21,7 @@ import {
   updateSchedule,
 } from "../storage/config-store.js";
 import type { StandupTarget } from "../types.js";
+import { formatUserFacingDiscordError } from "../utils/discord-api.js";
 import {
   formatScheduleTime,
   getCalendarDayWindow,
@@ -55,9 +56,11 @@ async function runSummarizeAndFollowUp(
       lines.join("\n"),
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Something went wrong.";
-    await editDeferredInteraction(applicationId, interactionToken, message);
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      formatUserFacingDiscordError(error),
+    );
   }
 }
 
@@ -89,9 +92,11 @@ async function runRemindMissingAndFollowUp(
       ].join("\n"),
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Something went wrong.";
-    await editDeferredInteraction(applicationId, interactionToken, message);
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      formatUserFacingDiscordError(error),
+    );
   }
 }
 
@@ -334,8 +339,6 @@ export async function handleStandupCommand(
         return ephemeral("Unknown subcommand.");
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Something went wrong.";
-    return ephemeral(message);
+    return ephemeral(formatUserFacingDiscordError(error));
   }
 }

@@ -1,4 +1,8 @@
-import { discordJson } from "../utils/discord-api.js";
+import {
+  DiscordApiError,
+  discordJson,
+  formatUserFacingDiscordError,
+} from "../utils/discord-api.js";
 
 const PAGE_SIZE = 1000;
 
@@ -20,10 +24,18 @@ export async function fetchMemberIdsWithRole(
     const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
     if (after) query.set("after", after);
 
-    const page = await discordJson<GuildMember[]>(
-      token,
-      `/guilds/${guildId}/members?${query}`,
-    );
+    let page: GuildMember[];
+    try {
+      page = await discordJson<GuildMember[]>(
+        token,
+        `/guilds/${guildId}/members?${query}`,
+      );
+    } catch (error) {
+      if (error instanceof DiscordApiError && error.status === 403) {
+        throw new Error(formatUserFacingDiscordError(error));
+      }
+      throw error;
+    }
 
     if (page.length === 0) break;
 
