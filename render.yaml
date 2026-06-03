@@ -41,11 +41,11 @@ services:
 
   - type: cron
     name: standup-daily-cron
+    runtime: node
     schedule: "0 9 * * 1-5"
-    # Quote the whole command — unquoted colons in "Authorization: Bearer" break YAML parsing
-    command: >-
-      curl -sS -X POST "https://standup-summarizer.onrender.com/cron/standup"
-      -H "Authorization: Bearer ${CRON_SECRET}"
+    buildCommand: "true"
+    # Must match your web service hostname (e.g. wizard-of-oz-discord.onrender.com)
+    startCommand: 'curl -sS -X POST "https://standup-summarizer.onrender.com/cron/standup" -H "Authorization: Bearer $CRON_SECRET"'
     envVars:
       - key: CRON_SECRET
         sync: false
