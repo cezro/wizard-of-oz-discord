@@ -1,0 +1,48 @@
+# Render Blueprint — Daily Standup Summarizer
+#
+# After deploy:
+# 1. Run supabase/migrations/001_standup_config.sql in your Supabase project.
+# 2. Set secret env vars in the Render dashboard for the web service.
+# 3. Discord Developer Portal → Interactions Endpoint URL:
+#    https://<your-service>.onrender.com/discord/interactions
+# 4. Create a Cron Job: POST https://<your-service>.onrender.com/cron/standup
+#    Header: Authorization: Bearer <CRON_SECRET>
+# 5. In Discord: /standup-config set channel:#your-standup-channel
+#
+# Schedule 0 9 * * 1-5 = 09:00 UTC = 17:00 Asia/Manila (Mon–Fri)
+
+services:
+  - type: web
+    name: standup-summarizer
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_APPLICATION_ID
+        sync: false
+      - key: DISCORD_PUBLIC_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.1-flash-lite
+
+  - type: cron
+    name: standup-daily-cron
+    schedule: "0 9 * * 1-5"
+    command: curl -sS -X POST "https://standup-summarizer.onrender.com/cron/standup" -H "Authorization: Bearer ${CRON_SECRET}"
+    envVars:
+      - key: CRON_SECRET
+        sync: false
