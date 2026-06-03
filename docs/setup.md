@@ -66,9 +66,14 @@ The primary objective is to eliminate manual oversight and provide an automated,
 
 ## 5. Required Environment Variables (`.env`)
 
+See [`.env.example`](../.env.example) and [env-setup.md](env-setup.md) for the current list. Per-server channel and timezone are configured via `/standup-config set` in Discord (stored in Supabase), not in env vars.
+
 ```env
 DISCORD_BOT_TOKEN=your_discord_bot_token
-DISCORD_CHANNEL_ID=your_target_channel_id
-DISCORD_WEBHOOK_URL=your_discord_webhook_url_if_using_webhook
-GEMINI_API_KEY=your_google_gem
+DISCORD_APPLICATION_ID=your_discord_application_id
+DISCORD_PUBLIC_KEY=your_discord_public_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SECRET_KEY=your_supabase_secret_key
+GEMINI_API_KEY=your_google_gemini_api_key
+CRON_SECRET=your_secure_cron_secret
 ```
