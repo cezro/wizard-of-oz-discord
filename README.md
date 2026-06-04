@@ -121,6 +121,7 @@ Channel, timezone, and schedule are **not** in `.env` — they are stored per gu
 2. Run Supabase migrations.
 3. Discord Developer Portal → **Interactions Endpoint URL**: `https://<your-service>.onrender.com/discord/interactions`
 4. In each server: `/standup-config` → enable and configure.
+5. **Free tier:** configure external keep-alive so the in-process scheduler stays running — see [docs/env-setup.md — Render free tier: keep scheduler alive](docs/env-setup.md#render-free-tier-keep-scheduler-alive).
 
 Health check: `GET /health`.
 

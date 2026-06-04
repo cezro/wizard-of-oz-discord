@@ -67,8 +67,9 @@ Requires **Manage Server** permission.
 1. Run Supabase migration; set `SUPABASE_*` and Discord env vars on the web service.
 2. Deploy; confirm `/health` returns OK.
 3. Set Interactions Endpoint URL in Discord to your Render URL.
-4. Ensure `STANDUP_INTERNAL_SCHEDULER` is on (default) so reminders/nudges/summaries run in-process every minute. No Render Cron Job required.
-5. Run `/standup-config set` in each server before that server's first scheduled summary.
+4. Ensure `STANDUP_INTERNAL_SCHEDULER` is on (default) so reminders/nudges/summaries run in-process every minute while awake.
+5. **Free tier:** configure external keep-alive per [docs/env-setup.md](../docs/env-setup.md#render-free-tier-keep-scheduler-alive) (`GET /health` every 10 min + optional `POST /cron/standup` backup jobs).
+6. Run `/standup-config set` in each server before that server's first scheduled summary.
 
 ## Environment setup
 

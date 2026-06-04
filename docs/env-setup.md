@@ -119,9 +119,11 @@ Or use any password manager / long random string (32+ characters).
 
 ### `STANDUP_INTERNAL_SCHEDULER`
 
-**What it is:** When `true` (default), the app runs reminder, nudge, and summary ticks every minute in-process. No separate Render Cron Job is needed.
+**What it is:** When `true` (default), the app runs reminder, nudge, and summary ticks every minute in-process while the Node process is running.
 
 **Where to get it:** Set in `.env` or leave unset (defaults to on). Set `false` only if you will trigger `POST /cron/standup` from an external scheduler instead.
+
+On **Render free tier**, you still need an external HTTP keep-alive (see [Render free tier: keep scheduler alive](#render-free-tier-keep-scheduler-alive)) so the process does not spin down between ticks.
 
 ---
 
@@ -213,14 +215,85 @@ curl -s -H "Authorization: Bot $DISCORD_BOT_TOKEN" \
 
 ---
 
+## Render free tier: keep scheduler alive
+
+Render **free web services** stop after about **15 minutes** without inbound HTTP. When stopped, the in-process minute scheduler does not run—scheduled 11:00 / 17:00 standups will not fire. Configure **both** items below after deploy.
+
+**Instance hours:** Render grants **750 free instance hours per month** while a service is running (spun-down time does not count). A 10-minute keep-alive ping keeps one web service up roughly **720 hours/month**, which fits within the limit.
+
+Replace `standup-summarizer.onrender.com` with your service hostname if different.
+
+### 1. Keep-alive pinger (required)
+
+Use [UptimeRobot](https://uptimerobot.com/), [cron-job.org](https://cron-job.org/), or similar:
+
+| Setting | Value |
+|---------|--------|
+| URL | `https://standup-summarizer.onrender.com/health` |
+| Method | `GET` |
+| Interval | **Every 10 minutes** |
+| Expected | HTTP **200**, body `{"ok":true}` |
+
+**UptimeRobot:** Add monitor → HTTP(s) → URL above → Monitoring interval **5 or 10 minutes**.
+
+**cron-job.org:** Create cronjob → URL `https://standup-summarizer.onrender.com/health` → Schedule `*/10 * * * *` → Request method GET.
+
+### 2. Pre-warm and schedule backup (recommended)
+
+The tick runs summary only in the **exact** local schedule minute. If a cold start finishes at 17:01, the 17:00 summary is skipped. Backup jobs wake the service before summary time and invoke the tick at the right UTC minute.
+
+Default guild timezone **Asia/Manila** (UTC+8, no DST):
+
+| Local time | UTC (cron) | Job |
+|------------|------------|-----|
+| Pre-warm (~16:55) | `55 8 * * 1-5` | `GET /health` |
+| Reminder 11:00 | `0 3 * * 1-5` | `POST /cron/standup` |
+| Summary 17:00 | `0 9 * * 1-5` | `POST /cron/standup` |
+
+`runStandupTick` skips non-active weekdays per guild, so Mon–Fri UTC cron is safe.
+
+**cron-job.org setup (three jobs):**
+
+1. **Pre-warm** — URL `https://standup-summarizer.onrender.com/health`, schedule `55 8 * * 1-5`, GET, timeout 60s.
+2. **Reminder tick** — URL `https://standup-summarizer.onrender.com/cron/standup`, schedule `0 3 * * 1-5`, POST, header `Authorization: Bearer YOUR_CRON_SECRET`, timeout **120s**.
+3. **Summary tick** — same as reminder but schedule `0 9 * * 1-5`.
+
+Use the same `CRON_SECRET` as in Render env vars (not committed to git).
+
+**curl examples (manual test):**
+
+```bash
+curl -sS https://standup-summarizer.onrender.com/health
+
+curl -sS -X POST https://standup-summarizer.onrender.com/cron/standup \
+  -H "Authorization: Bearer YOUR_CRON_SECRET"
+```
+
+### 3. Verify keep-alive
+
+1. Render Dashboard → **Logs** — after setup, see `GET /health` roughly every 10 minutes on workdays (no multi-hour gaps).
+2. On a weekday at **17:00** guild time, confirm the summary posts without `/standup summarize`.
+3. `/standup-config` → **Refresh** — **Last summary** should show today’s date.
+
+### 4. Verify reminder vs End of Day nudge (multi-server)
+
+1. **Guild A:** Summary and nudge at 18:00 (custom nudge or summary at 18:00) — at 18:00 expect **End of Day DSM Reminder** (if reporters missing) and **Daily Standup Summary**.
+2. **Guild B:** Summary at 02:45, daily reminder at 18:00, nudge same-as-summary — at 18:00 expect **Daily Standup Reminder** only; EoD nudge at 02:45.
+3. Render logs: `[cron/standup] guild <id>` JSON with `reminderSent`, `nudgeSent`, `summaryRan` when an action runs.
+4. If one guild’s reminder fails (e.g. missing Server Members Intent), summary on another guild at the same minute should still run (`summaryError` / `reminderError` per guild, not shared).
+
+**First slash command after idle:** Discord allows ~3s for interactions; a cold start can take ~60s. The keep-alive reduces this; retry once or open `/health` in a browser if a command fails.
+
+---
+
 ## Production deployment (Render)
 
 | Item | Value |
 |------|-------|
 | Health | `https://standup-summarizer.onrender.com/health` |
 | Interactions Endpoint URL | `https://standup-summarizer.onrender.com/discord/interactions` |
-| Scheduled standups | In-process tick every minute (`STANDUP_INTERNAL_SCHEDULER=true`, default) |
-| Debug tick (optional) | `POST https://standup-summarizer.onrender.com/cron/standup` with `Authorization: Bearer <CRON_SECRET>` |
+| Scheduled standups | In-process tick every minute while awake (`STANDUP_INTERNAL_SCHEDULER=true`, default) + [keep-alive](#render-free-tier-keep-scheduler-alive) on free tier |
+| Debug / backup tick | `POST https://standup-summarizer.onrender.com/cron/standup` with `Authorization: Bearer <CRON_SECRET>` |
 
 **Developer Portal — set Interactions Endpoint URL now** (General Information → paste URL above → Save Changes). Discord sends a signed PING; Render must be awake (hit `/health` first on free tier). Until this is saved, `/standup-config` will not respond in Discord.
 
@@ -248,6 +321,7 @@ Permissions `84992` = View Channel, Read Message History, Send Messages, Embed L
 | 8 | `cp .env.example .env` and paste all values |
 | 9 | `npm run dev` → `/standup-config set` in Discord |
 | 10 | Test: `curl -X POST http://localhost:3000/cron/standup -H "Authorization: Bearer YOUR_CRON_SECRET"` |
+| 11 | **Render free tier:** [keep-alive pinger + optional cron backup](#render-free-tier-keep-scheduler-alive) |
 
 ---
 

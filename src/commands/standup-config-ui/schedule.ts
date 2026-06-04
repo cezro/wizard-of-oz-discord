@@ -119,9 +119,12 @@ function formatDraftDescription(d: ScheduleDraft, timezone: string): string {
   return [
     "Set automated schedule times in guild timezone.",
     "",
-    `**Reminder:** ${reminder}`,
+    "**Daily reminder** posts *Daily Standup Reminder* (morning prompt).",
+    "**Missing DSM nudge** posts *End of Day DSM Reminder* (@who has not checked in). Default nudge time follows **Summary** unless you set a custom nudge time.",
+    "",
+    `**Daily reminder:** ${reminder}`,
     `**Summary:** ${summary}`,
-    `**Missing DSM nudge:** ${nudge}`,
+    `**Missing DSM nudge (EoD):** ${nudge}`,
     `**Timezone:** \`${timezone}\``,
   ].join("\n");
 }

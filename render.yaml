@@ -8,7 +8,14 @@
 # 4. In Discord: /standup-config set channel:#your-standup-channel
 #
 # Scheduled reminders/nudges/summaries run in-process (STANDUP_INTERNAL_SCHEDULER,
-# default on). No separate Render Cron Job required.
+# default on) while the process is running.
+#
+# Free tier (plan: free): the service spins down after ~15 min without inbound HTTP.
+# After deploy, configure external keep-alive — see docs/env-setup.md
+# "Render free tier: keep scheduler alive":
+#   - GET /health every 10 minutes (UptimeRobot, cron-job.org, etc.)
+#   - Optional backup: POST /cron/standup at 03:00 and 09:00 UTC Mon–Fri
+#     (11:00 and 17:00 Asia/Manila defaults), GET /health at 08:55 UTC Mon–Fri
 
 services:
   - type: web

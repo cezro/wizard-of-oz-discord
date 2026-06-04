@@ -71,7 +71,8 @@ export async function getEnabledConfigs(
   const { data, error } = await supabase
     .from("standup_config")
     .select("*")
-    .eq("enabled", true);
+    .eq("enabled", true)
+    .order("guild_id");
 
   if (error) throw new Error(`Failed to load enabled configs: ${error.message}`);
   return (data ?? []).map(rowToTarget);

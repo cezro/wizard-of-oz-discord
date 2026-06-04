@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Per-guild active weekdays (default Mon–Fri via `active_weekdays`); the minute tick skips reminder/nudge/summary on other days. Default summary time 17:00 Asia/Manila. **Scheduled (tick)** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today). In-process scheduler (`STANDUP_INTERNAL_SCHEDULER`, default on) replaces a separate Render Cron Job.
+1. **Schedule:** Per-guild active weekdays (default Mon–Fri via `active_weekdays`); the minute tick skips reminder/nudge/summary on other days. Default summary time 17:00 Asia/Manila. **Scheduled (tick)** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today). In-process scheduler (`STANDUP_INTERNAL_SCHEDULER`, default on) runs only while the process is awake; on Render free tier use external `GET /health` keep-alive (see `docs/env-setup.md`).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts, and invalid DSM check-ins (heuristic in `src/utils/dsm-validation.ts`; attachment-only posts count). Same rules for summaries and missing-reporter nudges.
 4. **Order:** Oldest → newest before Gemini.
