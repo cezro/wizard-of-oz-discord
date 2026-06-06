@@ -1,5 +1,12 @@
 import WebSocket from "ws";
 
+import {
+  clearMemberCache,
+  ingestGuildMembersChunk,
+  removeGuildMember,
+  upsertGuildMember,
+} from "./member-cache.js";
+
 const GATEWAY_URL = "wss://gateway.discord.gg/?v=10&encoding=json";
 const GUILDS_INTENT = 1 << 0;
 const GUILD_MEMBERS_INTENT = 1 << 1;
@@ -33,6 +40,19 @@ interface ReadyData {
   user: { username: string };
 }
 
+interface GuildMembersChunkData {
+  guild_id: string;
+  members: { user: { id: string; bot?: boolean }; roles: string[] }[];
+  chunk_index: number;
+  chunk_count: number;
+}
+
+interface GuildMemberEventData {
+  guild_id: string;
+  user: { id: string; bot?: boolean };
+  roles: string[];
+}
+
 export function startDiscordGateway(token: string): () => void {
   let ws: WebSocket | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -40,6 +60,7 @@ export function startDiscordGateway(token: string): () => void {
   let lastSequence: number | null = null;
   let intentionalClose = false;
   let reconnectAttempts = 0;
+  let hadDisconnect = false;
 
   function clearHeartbeat(): void {
     if (heartbeatTimer) {
@@ -55,6 +76,7 @@ export function startDiscordGateway(token: string): () => void {
   }
 
   function identify(): void {
+    clearMemberCache();
     send({
       op: Opcodes.Identify,
       d: {
@@ -104,6 +126,49 @@ export function startDiscordGateway(token: string): () => void {
     setTimeout(connect, delay);
   }
 
+  function handleDispatch(event: string, data: unknown): void {
+    switch (event) {
+      case "READY": {
+        const ready = data as ReadyData;
+        sessionId = ready.session_id;
+        reconnectAttempts = 0;
+        if (hadDisconnect) {
+          console.log(`[gateway] reconnected as ${ready.user.username}`);
+          hadDisconnect = false;
+        } else {
+          console.log(`[gateway] online as ${ready.user.username}`);
+        }
+        break;
+      }
+      case "GUILD_MEMBERS": {
+        const chunk = data as GuildMembersChunkData;
+        ingestGuildMembersChunk(
+          chunk.guild_id,
+          chunk.members,
+          chunk.chunk_index,
+          chunk.chunk_count,
+        );
+        break;
+      }
+      case "GUILD_MEMBER_ADD":
+      case "GUILD_MEMBER_UPDATE": {
+        const member = data as GuildMemberEventData;
+        upsertGuildMember(
+          member.guild_id,
+          member.user.id,
+          member.roles,
+          member.user.bot ?? false,
+        );
+        break;
+      }
+      case "GUILD_MEMBER_REMOVE": {
+        const member = data as GuildMemberEventData;
+        removeGuildMember(member.guild_id, member.user.id);
+        break;
+      }
+    }
+  }
+
   function connect(): void {
     clearHeartbeat();
     ws = new WebSocket(GATEWAY_URL);
@@ -135,6 +200,7 @@ export function startDiscordGateway(token: string): () => void {
           const resumable = payload.d as boolean;
           if (!resumable) {
             sessionId = null;
+            clearMemberCache();
           }
           setTimeout(() => {
             if (resumable) {
@@ -146,11 +212,8 @@ export function startDiscordGateway(token: string): () => void {
           break;
         }
         case Opcodes.Dispatch:
-          if (payload.t === "READY") {
-            const ready = payload.d as ReadyData;
-            sessionId = ready.session_id;
-            reconnectAttempts = 0;
-            console.log(`[gateway] online as ${ready.user.username}`);
+          if (payload.t) {
+            handleDispatch(payload.t, payload.d);
           }
           break;
       }
@@ -158,6 +221,7 @@ export function startDiscordGateway(token: string): () => void {
 
     ws.on("close", (code, reason) => {
       clearHeartbeat();
+      hadDisconnect = true;
       console.warn(`[gateway] disconnected (${code}): ${reason.toString()}`);
       if (!intentionalClose) {
         scheduleReconnect();

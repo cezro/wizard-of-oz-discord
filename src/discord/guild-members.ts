@@ -3,12 +3,18 @@ import {
   discordJson,
   formatUserFacingDiscordError,
 } from "../utils/discord-api.js";
+import { getCachedMemberIdsWithRole } from "./member-cache.js";
 
 const PAGE_SIZE = 1000;
+const PAGE_DELAY_MS = 100;
 
 interface GuildMember {
   user: { id: string; bot?: boolean };
   roles: string[];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function fetchMemberIdsWithRole(
@@ -17,6 +23,11 @@ export async function fetchMemberIdsWithRole(
   roleId: string,
   excludeUserId?: string,
 ): Promise<string[]> {
+  const cached = getCachedMemberIdsWithRole(guildId, roleId, excludeUserId);
+  if (cached !== null) {
+    return cached;
+  }
+
   const memberIds: string[] = [];
   let after: string | undefined;
 
@@ -32,7 +43,7 @@ export async function fetchMemberIdsWithRole(
       );
     } catch (error) {
       if (error instanceof DiscordApiError && error.status === 403) {
-        throw new Error(formatUserFacingDiscordError(error));
+        throw new Error(formatUserFacingDiscordError(error, "members"));
       }
       throw error;
     }
@@ -49,6 +60,7 @@ export async function fetchMemberIdsWithRole(
 
     if (page.length < PAGE_SIZE) break;
     after = page[page.length - 1].user.id;
+    await sleep(PAGE_DELAY_MS);
   }
 
   return memberIds;

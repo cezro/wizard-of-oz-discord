@@ -1,7 +1,15 @@
 import type { AppConfig } from "../config.js";
 import type { ProcessResult, StandupTarget } from "../types.js";
-import { discordJson } from "../utils/discord-api.js";
+import {
+  DiscordApiError,
+  discordJson,
+  formatDiscordValidationErrors,
+} from "../utils/discord-api.js";
 import { markdownForFileExport } from "../utils/markdown-export.js";
+import {
+  resolveStandupMarkdownAttachment,
+  type MessageWithComponents,
+} from "../utils/standup-attachment.js";
 import {
   formatDateInTimezone,
   getLocalTimeParts,
@@ -74,7 +82,6 @@ interface ComponentsV2MessageBody {
 interface PatchMessageBody {
   flags: number;
   components: DiscordMessageComponent[];
-  attachments: { id: string; filename: string }[];
 }
 
 interface DiscordCreatedMessage {
@@ -225,44 +232,66 @@ export async function broadcastResult(
     { filename, content: exportMarkdown },
   );
 
-  const attachment = created.attachments[0];
-  if (!attachment?.url) {
-    console.error(
-      "[egress/discord] Summary posted without attachment URL; removing download button",
-    );
+  const attachmentUrl = await resolveSummaryAttachmentUrl(
+    config,
+    target.channelId,
+    created.id,
+  );
+
+  if (attachmentUrl) {
     try {
       await patchChannelMessage(config, target.channelId, created.id, {
         flags: IS_COMPONENTS_V2,
-        components: buildSummaryComponents(containerChildren, filename, null),
-        attachments: attachment
-          ? [{ id: attachment.id, filename: attachment.filename }]
-          : [],
+        components: buildSummaryComponents(containerChildren, filename, {
+          url: attachmentUrl,
+        }),
       });
     } catch (error) {
-      console.error(
-        "[egress/discord] Failed to patch summary after missing attachment URL:",
-        error,
-      );
+      logPatchFailure(error);
     }
-    return "summary";
-  }
-
-  try {
-    await patchChannelMessage(config, target.channelId, created.id, {
-      flags: IS_COMPONENTS_V2,
-      components: buildSummaryComponents(containerChildren, filename, {
-        url: attachment.url,
-      }),
-      attachments: [{ id: attachment.id, filename: attachment.filename }],
-    });
-  } catch (error) {
-    console.error(
-      "[egress/discord] Failed to upgrade download button to link; interaction fallback remains:",
-      error,
-    );
   }
 
   return "summary";
+}
+
+function logPatchFailure(error: unknown): void {
+  if (error instanceof DiscordApiError) {
+    const body = error.body as { errors?: Record<string, unknown> } | undefined;
+    const detail = formatDiscordValidationErrors(body?.errors);
+    console.error(
+      "[egress/discord] Failed to upgrade download button to link; interaction fallback remains:",
+      error.message,
+      detail ?? "",
+    );
+    return;
+  }
+  console.error(
+    "[egress/discord] Failed to upgrade download button to link; interaction fallback remains:",
+    error,
+  );
+}
+
+const ATTACHMENT_URL_RETRIES = 2;
+const ATTACHMENT_URL_RETRY_MS = 500;
+
+async function resolveSummaryAttachmentUrl(
+  config: AppConfig,
+  channelId: string,
+  messageId: string,
+): Promise<string | undefined> {
+  for (let attempt = 0; attempt <= ATTACHMENT_URL_RETRIES; attempt++) {
+    const message = await discordJson<MessageWithComponents & { id: string }>(
+      config.discordBotToken,
+      `/channels/${channelId}/messages/${messageId}`,
+    );
+    const attachment = resolveStandupMarkdownAttachment(message);
+    if (attachment?.url) return attachment.url;
+
+    if (attempt < ATTACHMENT_URL_RETRIES) {
+      await new Promise((resolve) => setTimeout(resolve, ATTACHMENT_URL_RETRY_MS));
+    }
+  }
+  return undefined;
 }
 
 function buildSummaryComponents(

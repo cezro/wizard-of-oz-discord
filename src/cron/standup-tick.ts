@@ -9,6 +9,10 @@ import {
   markSummarySent,
 } from "../storage/config-store.js";
 import type { StandupTarget } from "../types.js";
+import {
+  DiscordApiError,
+  formatUserFacingDiscordError,
+} from "../utils/discord-api.js";
 import { isActiveWeekday } from "../utils/weekdays.js";
 import {
   getLocalTimeParts,
@@ -35,6 +39,12 @@ export interface StandupTickResult {
 
 let tickInFlight: Promise<StandupTickResult> | null = null;
 
+const INTER_GUILD_STAGGER_MS = 2000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
 }
@@ -43,12 +53,23 @@ async function runTickAction(
   label: string,
   guildId: string,
   fn: () => Promise<void>,
+  opts?: { channelId?: string; errorContext?: "channel" },
 ): Promise<string | undefined> {
   try {
     await fn();
     return undefined;
   } catch (error) {
-    console.error(`[cron/standup] guild ${guildId} ${label}:`, error);
+    if (opts?.channelId) {
+      console.error(
+        `[cron/standup] guild ${guildId} channel ${opts.channelId} ${label}:`,
+        error,
+      );
+    } else {
+      console.error(`[cron/standup] guild ${guildId} ${label}:`, error);
+    }
+    if (opts?.errorContext === "channel" && error instanceof DiscordApiError) {
+      return formatUserFacingDiscordError(error, "channel");
+    }
     return errorMessage(error);
   }
 }
@@ -100,8 +121,11 @@ async function runStandupTickInner(
   const targets = await getEnabledConfigs(config);
   const results: GuildTickResult[] = [];
 
-  for (const target of targets) {
-    const result = await processGuildTick(config, target, now);
+  for (let i = 0; i < targets.length; i++) {
+    if (i > 0) {
+      await sleep(INTER_GUILD_STAGGER_MS);
+    }
+    const result = await processGuildTick(config, targets[i], now);
     logGuildTickResult(result);
     results.push(result);
   }
@@ -195,6 +219,7 @@ async function processGuildTick(
         await runPipeline(config, target);
         await markSummarySent(config, target.guildId, local.dateString);
       },
+      { channelId: target.channelId, errorContext: "channel" },
     );
     if (summaryError) {
       result.summaryError = summaryError;

@@ -46,7 +46,7 @@ async function runSummarizeAndFollowUp(
     await editDeferredInteraction(
       applicationId,
       interactionToken,
-      formatUserFacingDiscordError(error),
+      formatUserFacingDiscordError(error, "channel"),
     );
   }
 }

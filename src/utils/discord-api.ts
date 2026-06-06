@@ -1,8 +1,10 @@
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_RETRIES = 3;
+const MAX_GLOBAL_RETRIES = 6;
 
 interface DiscordRateLimitBody {
   retry_after?: number;
+  global?: boolean;
   message?: string;
 }
 
@@ -23,13 +25,28 @@ interface DiscordErrorBody {
   errors?: Record<string, unknown>;
 }
 
+export type DiscordErrorContext = "members" | "channel";
+
 /** Maps common Discord API failures to actionable text for slash-command replies. */
-export function formatUserFacingDiscordError(error: unknown): string {
+export function formatUserFacingDiscordError(
+  error: unknown,
+  context: DiscordErrorContext = "members",
+): string {
   if (error instanceof DiscordApiError) {
     if (error.status === 403) {
       const body = error.body as DiscordErrorBody | undefined;
       const codeSuffix =
         body?.code !== undefined ? ` (Discord code ${body.code})` : "";
+      if (context === "channel") {
+        return [
+          `Discord denied access to the standup channel${codeSuffix}.`,
+          "",
+          "Check that:",
+          "1. The channel in `/standup-config show` still exists",
+          "2. The bot can **View Channel** and **Read Message History** there",
+          "3. Re-run `/standup-config set channel:#your-standup-channel` if needed",
+        ].join("\n");
+      }
       return [
         `Discord denied access when listing server members${codeSuffix}.`,
         "",
@@ -55,7 +72,7 @@ export function formatUserFacingDiscordError(error: unknown): string {
   return "Something went wrong.";
 }
 
-function formatDiscordValidationErrors(
+export function formatDiscordValidationErrors(
   errors: Record<string, unknown> | undefined,
 ): string | null {
   if (!errors || Object.keys(errors).length === 0) return null;
@@ -79,7 +96,7 @@ export async function discordFetch(
 
   const isMultipart = init?.body instanceof FormData;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     const response = await fetch(url, {
       ...init,
       headers: {
@@ -89,25 +106,29 @@ export async function discordFetch(
       },
     });
 
-    if (response.status === 429 && attempt < MAX_RETRIES) {
+    if (response.status === 429) {
       let retryAfterMs = 1000;
+      let isGlobal = false;
       try {
         const body = (await response.clone().json()) as DiscordRateLimitBody;
         if (typeof body.retry_after === "number") {
           retryAfterMs = Math.ceil(body.retry_after * 1000);
         }
+        isGlobal = body.global === true;
       } catch {
         const header = response.headers.get("retry-after");
         if (header) retryAfterMs = Math.ceil(parseFloat(header) * 1000);
       }
-      await sleep(retryAfterMs);
-      continue;
+
+      const maxRetries = isGlobal ? MAX_GLOBAL_RETRIES : MAX_RETRIES;
+      if (attempt < maxRetries) {
+        await sleep(retryAfterMs);
+        continue;
+      }
     }
 
     return response;
   }
-
-  throw new DiscordApiError("Discord API rate limit exceeded after retries", 429);
 }
 
 export async function discordJson<T>(
