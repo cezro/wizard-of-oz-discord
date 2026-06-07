@@ -7,7 +7,6 @@ import {
   handleStandupDownloadInteraction,
   isStandupDownloadInteraction,
 } from "../commands/standup-download.js";
-import { handleStandupDebugCommand } from "../commands/standup-debug.js";
 import { handleStandupCommand } from "../commands/standup.js";
 import type { AppConfig } from "../config.js";
 import type { DiscordInteraction } from "../discord/interaction-utils.js";
@@ -57,9 +56,6 @@ export async function handleInteraction(
     }
     if (commandName === "standup") {
       return handleStandupCommand(config, interaction);
-    }
-    if (commandName === "standup-debug") {
-      return handleStandupDebugCommand(config, interaction);
     }
     return {
       type: 4,

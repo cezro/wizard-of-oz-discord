@@ -10,8 +10,10 @@ import {
   type DiscordInteraction,
   type InteractionResponse,
 } from "../discord/interaction-utils.js";
+import { requireManageGuild } from "../discord/permissions.js";
 import { runPipeline, type RunPipelineOptions } from "../pipeline.js";
 import { runMissingReporterNudge } from "../standup/missing-reporters.js";
+import { runDailyReminder } from "../standup/reminder.js";
 import { configRowToTarget, getConfig } from "../storage/config-store.js";
 import type { InvalidCheckIn, StandupTarget } from "../types.js";
 import { formatUserFacingDiscordError } from "../utils/discord-api.js";
@@ -118,6 +120,33 @@ export async function handleStandupCommand(
 
   try {
     switch (subcommand) {
+      case "start": {
+        if (!requireManageGuild(interaction)) {
+          return ephemeral(
+            "You need **Manage Server** permission to use this command.",
+          );
+        }
+
+        const row = await getConfig(config, guildId);
+        if (!row) {
+          return ephemeral(
+            "No configuration yet. Run `/standup-config` first.",
+          );
+        }
+
+        const target = configRowToTarget(row);
+        const { pingedCount } = await runDailyReminder(config, target);
+
+        const pingNote =
+          pingedCount > 0
+            ? ` Pinged **${pingedCount}** reporter(s).`
+            : " No reporter role configured — text only.";
+
+        return ephemeral(
+          `Daily DSM reminder posted to <#${row.channel_id}>.${pingNote} (Cron \`last_reminder_date\` was not updated.)`,
+        );
+      }
+
       case "remind-missing": {
         const row = await getConfig(config, guildId);
         if (!row) {

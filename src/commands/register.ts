@@ -36,16 +36,16 @@ const STANDUP_CONFIG_COMMAND = {
   default_member_permissions: MANAGE_GUILD_PERMISSION,
 };
 
-const STANDUP_DEBUG_COMMAND = {
-  name: "standup-debug",
-  description: "Debug: force-post the daily DSM reminder (not missing-reporter nudge)",
-  default_member_permissions: MANAGE_GUILD_PERMISSION,
-};
-
 const STANDUP_COMMAND = {
   name: "standup",
   description: "Manual standup actions for this server",
   options: [
+    {
+      type: 1,
+      name: "start",
+      description:
+        "Force-post the daily DSM reminder (does not update last_reminder_date)",
+    },
     {
       type: 1,
       name: "summarize",
@@ -66,7 +66,7 @@ const STANDUP_COMMAND = {
 };
 
 export async function registerSlashCommands(config: AppConfig): Promise<void> {
-  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_COMMAND, STANDUP_DEBUG_COMMAND];
+  const commands = [STANDUP_CONFIG_COMMAND, STANDUP_COMMAND];
 
   try {
     await discordJson(

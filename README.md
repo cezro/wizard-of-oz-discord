@@ -92,7 +92,7 @@ Run these in order in the Supabase SQL editor before using schedule or role feat
 | `/standup-config` | Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year` in guild timezone) |
 | `/standup remind-missing` | Mention reporters who have not posted a valid check-in in the last 24 hours |
-| `/standup-debug` | Force-post the daily DSM reminder (does not update `last_reminder_date`) |
+| `/standup start` | Force-post the daily DSM reminder (does not update `last_reminder_date`) |
 
 ## Environment variables
 
