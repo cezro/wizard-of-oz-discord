@@ -42,6 +42,11 @@ const STANDUP_COMMAND = {
   options: [
     {
       type: 1,
+      name: "help",
+      description: "Show help for all standup slash commands",
+    },
+    {
+      type: 1,
       name: "start",
       description:
         "Force-post the daily DSM reminder (does not update last_reminder_date)",

@@ -108,6 +108,26 @@ function formatRemindMissingReply(
   return lines.join("\n");
 }
 
+function formatStandupHelp(): string {
+  return [
+    "**Standup bot commands**",
+    "",
+    "**/standup help** — Show this reference.",
+    "",
+    "**/standup start** — Force-post the daily DSM reminder. Does not update `last_reminder_date`.",
+    "Requires **Manage Server**.",
+    "",
+    "**/standup summarize** [month] [day] [year] — Force-run the summary pipeline for a calendar day in the guild timezone. Omitted date parts default to today.",
+    "Requires standup configuration (see `/standup-config`).",
+    "",
+    "**/standup remind-missing** — Nudge reporters who have not posted a valid check-in in the rolling 24-hour window.",
+    "Requires a reporter role configured in `/standup-config`.",
+    "",
+    "**/standup-config** — Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable.",
+    "Requires **Manage Server**. Set this up before using manual `/standup` actions.",
+  ].join("\n");
+}
+
 export async function handleStandupCommand(
   config: AppConfig,
   interaction: DiscordInteraction,
@@ -227,6 +247,9 @@ export async function handleStandupCommand(
 
         return deferredMessage();
       }
+
+      case "help":
+        return ephemeral(formatStandupHelp());
 
       default:
         return ephemeral("Unknown subcommand.");
