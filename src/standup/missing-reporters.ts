@@ -4,7 +4,10 @@ import { broadcastMissingReporterNudge } from "../egress/discord.js";
 import { ingestStandupMessages } from "../ingestion/discord.js";
 import type { InvalidCheckIn, StandupTarget } from "../types.js";
 import { discordJson } from "../utils/discord-api.js";
-import { getStandupWindow } from "../utils/timezone.js";
+import {
+  getCalendarDayWindow,
+  getLocalTimeParts,
+} from "../utils/timezone.js";
 
 export interface MissingReporterNudgeResult {
   missingCount: number;
@@ -26,9 +29,15 @@ export function findMissingReporterIds(
   return expectedIds.filter((id) => !postedIds.has(id));
 }
 
+export interface MissingReporterNudgeOptions {
+  /** YYYY-MM-DD in guild timezone; defaults to today. */
+  dateString?: string;
+}
+
 export async function runMissingReporterNudge(
   config: AppConfig,
   target: StandupTarget,
+  options?: MissingReporterNudgeOptions,
 ): Promise<MissingReporterNudgeResult> {
   if (!target.reporterRoleId) {
     throw new Error(
@@ -36,7 +45,9 @@ export async function runMissingReporterNudge(
     );
   }
 
-  const window = getStandupWindow(target.timezone);
+  const dateString =
+    options?.dateString ?? getLocalTimeParts(target.timezone).dateString;
+  const window = getCalendarDayWindow(target.timezone, dateString);
   const expectedIds = await getExpectedReporterIds(
     config,
     target.guildId,

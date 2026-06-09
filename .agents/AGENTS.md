@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Node.js service that fetches standup messages from a Discord channel (last 24 hours), summarizes them with Gemini, and posts a rich embed summary. Guild settings (standup channel, timezone) are stored in **Supabase** and configured via `/standup-config` slash commands.
+Node.js service that fetches standup messages from a Discord channel for the current calendar day in each guild's timezone, summarizes them with Gemini, and posts a rich embed summary. Guild settings (standup channel, timezone) are stored in **Supabase** and configured via `/standup-config` slash commands.
 
 Source of truth: [docs/setup.md](../docs/setup.md).
 

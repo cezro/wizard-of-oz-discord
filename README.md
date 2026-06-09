@@ -40,7 +40,7 @@ flowchart LR
 
 1. Team members post async DSMs in the configured channel.
 2. An in-process scheduler runs every minute (`STANDUP_INTERNAL_SCHEDULER`, default on) and matches each enabled guild’s reminder, nudge, and summary times (active weekdays only, default Mon–Fri).
-3. At summary time, the bot ingests messages (rolling 24-hour window for scheduled runs), calls Gemini, and posts a Components V2 summary with optional markdown download.
+3. At summary time, the bot ingests messages for the current calendar day in the guild timezone, calls Gemini, and posts a Components V2 summary with optional markdown download.
 
 Optional: trigger the same tick via `POST /cron/standup` with `Authorization: Bearer <CRON_SECRET>`.
 
@@ -91,7 +91,7 @@ Run these in order in the Supabase SQL editor before using schedule or role feat
 | --- | --- |
 | `/standup-config` | Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable |
 | `/standup summarize` | Force-run the summary pipeline (optional `month`, `day`, `year` in guild timezone) |
-| `/standup remind-missing` | Mention reporters who have not posted a valid check-in in the last 24 hours |
+| `/standup remind-missing` | Mention reporters who have not posted a valid check-in today (guild timezone) |
 | `/standup start` | Force-post the daily DSM reminder (does not update `last_reminder_date`) |
 
 ## Environment variables

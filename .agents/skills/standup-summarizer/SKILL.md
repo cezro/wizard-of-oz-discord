@@ -21,7 +21,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 
 ## Non-negotiables (from docs/setup.md)
 
-1. **Schedule:** Per-guild active weekdays (default Mon–Fri via `active_weekdays`); the minute tick skips reminder/nudge/summary on other days. Default summary time 17:00 Asia/Manila. **Scheduled (tick)** fetch window = inclusive rolling 24 hours (`windowStart` ≤ message timestamp ≤ `windowEnd`), both bounds enforced at ingestion. **`/standup summarize`** uses a calendar day in guild timezone (optional `month` / `day` / `year`; unset fields default to today). In-process scheduler (`STANDUP_INTERNAL_SCHEDULER`, default on) runs only while the process is awake; on Render free tier use external `GET /health` keep-alive (see `docs/env-setup.md`).
+1. **Schedule:** Per-guild active weekdays (default Mon–Fri via `active_weekdays`); the minute tick skips reminder/nudge/summary on other days. Default summary time 17:00 Asia/Manila. **Scheduled (tick)** and **`/standup summarize`** fetch window = inclusive calendar day in guild timezone (local midnight through end of day; optional `month` / `day` / `year` for manual runs). Both bounds enforced at ingestion. In-process scheduler (`STANDUP_INTERNAL_SCHEDULER`, default on) runs only while the process is awake; on Render free tier use external `GET /health` keep-alive (see `docs/env-setup.md`).
 2. **Zero posts:** Do not call Gemini. Post: "No standup updates recorded for today! Hope everyone had a productive day."
 3. **Sanitize:** Exclude system messages, bot messages, emoji-only posts, and invalid DSM check-ins (heuristic in `src/utils/dsm-validation.ts`; attachment-only posts count). Same rules for summaries and missing-reporter nudges.
 4. **Order:** Oldest → newest before Gemini.
@@ -33,7 +33,7 @@ Project-specific skill for the wizard-of-oz-discord standup bot.
 7. **Egress:** Bot API only; Components V2 Container + Text Display title `📊 Daily Standup Summary - [date]`; hidden `standup-summary-YYYY-MM-DD.md` attachment with **Download Markdown** link button; file export uses `@displayName` not `<@userId>`.
 8. **HTTP tick security:** `Authorization: Bearer ${CRON_SECRET}` on optional `POST /cron/standup`.
 9. **Channel config:** Per-server via Supabase only (`/standup-config` hub); tick loads all enabled rows.
-10. **Missing DSM nudge:** Same rolling 24h ingestion window as scheduled summary; compares role members (`GET /guilds/{id}/members`) to authors with **valid** check-ins only; invalid posts reported in `/standup remind-missing` ephemeral reply; tick marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.
+10. **Missing DSM nudge:** Same calendar-day ingestion window as scheduled summary; compares role members (`GET /guilds/{id}/members`) to authors with **valid** check-ins only; invalid posts reported in `/standup remind-missing` ephemeral reply; tick marks `last_nudge_date` once per local day (silent if everyone posted). Requires Server Members Intent.
 
 ## File map
 

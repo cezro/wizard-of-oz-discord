@@ -7,7 +7,8 @@ import type { PipelineResult, StandupTarget } from "./types.js";
 import { buildAuthorDisplayNameMap } from "./utils/markdown-export.js";
 import {
   dateStringToReferenceDate,
-  getStandupWindow,
+  getCalendarDayWindow,
+  getLocalTimeParts,
   type StandupWindow,
 } from "./utils/timezone.js";
 
@@ -33,12 +34,14 @@ export async function runPipeline(
   target: StandupTarget,
   options?: RunPipelineOptions,
 ): Promise<GuildPipelineResult> {
-  const window = options?.window ?? getStandupWindow(target.timezone);
+  const todayDateString = getLocalTimeParts(target.timezone).dateString;
+  const summaryDate = options?.summaryDate ?? todayDateString;
+  const window =
+    options?.window ??
+    getCalendarDayWindow(target.timezone, summaryDate);
   const data = await ingestStandupMessages(config, target, window);
   const processed = await processStandup(config, data);
-  const titleDate = options?.summaryDate
-    ? dateStringToReferenceDate(target.timezone, options.summaryDate)
-    : undefined;
+  const titleDate = dateStringToReferenceDate(target.timezone, summaryDate);
   const authorDisplayNames = buildAuthorDisplayNameMap(data.messages);
   const broadcastTarget = options?.broadcastChannelId
     ? { ...target, channelId: options.broadcastChannelId }

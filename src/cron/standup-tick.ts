@@ -15,6 +15,7 @@ import {
 } from "../utils/discord-api.js";
 import { isActiveWeekday } from "../utils/weekdays.js";
 import {
+  getCalendarDayWindow,
   getLocalTimeParts,
   matchesSchedule,
   resolveNudgeSchedule,
@@ -191,7 +192,9 @@ async function processGuildTick(
       "nudge",
       target.guildId,
       async () => {
-        const nudgeResult = await runMissingReporterNudge(config, target);
+        const nudgeResult = await runMissingReporterNudge(config, target, {
+          dateString: local.dateString,
+        });
         if (nudgeResult.posted) {
           await markNudgeSent(config, target.guildId, local.dateString);
           result.nudgeSent = true;
@@ -216,7 +219,10 @@ async function processGuildTick(
       "summary",
       target.guildId,
       async () => {
-        await runPipeline(config, target);
+        await runPipeline(config, target, {
+          window: getCalendarDayWindow(target.timezone, local.dateString),
+          summaryDate: local.dateString,
+        });
         await markSummarySent(config, target.guildId, local.dateString);
       },
       { channelId: target.channelId, errorContext: "channel" },

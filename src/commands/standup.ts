@@ -88,7 +88,7 @@ function formatRemindMissingReply(
 
   if (!result.posted) {
     lines.push(
-      "Everyone with the reporter role has posted a valid DSM in the rolling 24-hour window.",
+      "Everyone with the reporter role has posted a valid DSM today (guild timezone).",
     );
   } else {
     lines.push("Missing DSM reminder posted.");
@@ -120,7 +120,7 @@ function formatStandupHelp(): string {
     "**/standup summarize** [month] [day] [year] — Force-run the summary pipeline for a calendar day in the guild timezone. Omitted date parts default to today.",
     "Requires standup configuration (see `/standup-config`).",
     "",
-    "**/standup remind-missing** — Nudge reporters who have not posted a valid check-in in the rolling 24-hour window.",
+    "**/standup remind-missing** — Nudge reporters who have not posted a valid check-in today (guild timezone).",
     "Requires a reporter role configured in `/standup-config`.",
     "",
     "**/standup-config** — Interactive hub: channel, timezone, schedule, active weekdays, reporter role, enable/disable.",
