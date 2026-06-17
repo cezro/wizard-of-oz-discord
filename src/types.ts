@@ -14,6 +14,7 @@ export interface StandupTarget {
   lastNudgeDate: string | null;
   /** JS weekday 0–6 (Sun–Sat); default Mon–Fri when unset in DB */
   activeWeekdays: number[];
+  accessFailureCount: number;
 }
 
 export interface SanitizedMessage {

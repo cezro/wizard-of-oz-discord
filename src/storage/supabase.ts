@@ -21,6 +21,8 @@ export interface StandupConfigRow {
   nudge_minute: number;
   last_nudge_date: string | null;
   active_weekdays?: number[] | null;
+  access_failure_count: number;
+  last_access_failure_at: string | null;
 }
 
 let client: SupabaseClient | null = null;

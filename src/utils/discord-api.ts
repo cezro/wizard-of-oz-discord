@@ -1,6 +1,7 @@
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_RETRIES = 3;
 const MAX_GLOBAL_RETRIES = 6;
+const DISCORD_FETCH_TIMEOUT_MS = 30_000;
 
 interface DiscordRateLimitBody {
   retry_after?: number;
@@ -97,8 +98,16 @@ export async function discordFetch(
   const isMultipart = init?.body instanceof FormData;
 
   for (let attempt = 0; ; attempt++) {
+    const timeoutSignal = AbortSignal.timeout(DISCORD_FETCH_TIMEOUT_MS);
+    const userSignal = init?.signal;
+    const signal =
+      userSignal != null
+        ? AbortSignal.any([userSignal, timeoutSignal])
+        : timeoutSignal;
+
     const response = await fetch(url, {
       ...init,
+      signal,
       headers: {
         Authorization: `Bot ${token}`,
         ...(isMultipart ? {} : { "Content-Type": "application/json" }),
