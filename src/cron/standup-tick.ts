@@ -1,3 +1,4 @@
+import { isDiscordCircuitOpen } from "../discord/discord-circuit.js";
 import type { AppConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import {
@@ -207,6 +208,13 @@ async function runStandupTickWork(
   config: AppConfig,
   now: Date,
 ): Promise<StandupTickResult> {
+  if (isDiscordCircuitOpen()) {
+    console.warn(
+      "[cron/standup] tick skipped — Discord circuit open (Cloudflare 1015)",
+    );
+    return { results: [] };
+  }
+
   const targets = await withTimeout(
     getEnabledConfigs(config),
     SUPABASE_LOAD_TIMEOUT_MS,

@@ -1,10 +1,16 @@
+import {
+  assertDiscordAvailable,
+  CLOUDFLARE_1015_MESSAGE,
+  DiscordCircuitOpenError,
+  isCloudflareRateLimitResponse,
+  recordCloudflare1015,
+} from "../discord/discord-circuit.js";
+
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_RETRIES = 3;
 const MAX_GLOBAL_RETRIES = 6;
 const DISCORD_FETCH_TIMEOUT_MS = 30_000;
 const DISCORD_FETCH_MAX_WALL_CLOCK_MS = 60_000;
-const CLOUDFLARE_1015_MESSAGE =
-  "Discord is rate-limiting this server IP (Cloudflare 1015). Try again in a few minutes.";
 
 interface DiscordRateLimitBody {
   retry_after?: number;
@@ -36,6 +42,9 @@ export function formatUserFacingDiscordError(
   error: unknown,
   context: DiscordErrorContext = "members",
 ): string {
+  if (error instanceof DiscordCircuitOpenError) {
+    return error.message;
+  }
   if (error instanceof DiscordApiError) {
     if (error.status === 429 && error.message.includes("Cloudflare 1015")) {
       return error.message;
@@ -94,26 +103,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isCloudflareHtmlBody(text: string): boolean {
-  const lower = text.trimStart().toLowerCase();
-  return lower.startsWith("<!doctype") || lower.includes("error 1015");
-}
-
-function isCloudflareRateLimitResponse(
-  status: number,
-  bodyText: string,
-  contentType: string | null,
-): boolean {
-  if (status !== 429) return false;
-  if (contentType?.includes("text/html")) return true;
-  return isCloudflareHtmlBody(bodyText);
-}
-
 export async function discordFetch(
   token: string,
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
+  assertDiscordAvailable();
+
   const url = path.startsWith("http") ? path : `${DISCORD_API_BASE}${path}`;
 
   const isMultipart = init?.body instanceof FormData;
@@ -149,6 +145,7 @@ export async function discordFetch(
       const bodyText = await response.clone().text();
 
       if (isCloudflareRateLimitResponse(response.status, bodyText, contentType)) {
+        recordCloudflare1015();
         throw new DiscordApiError(CLOUDFLARE_1015_MESSAGE, 429, bodyText.slice(0, 300));
       }
 

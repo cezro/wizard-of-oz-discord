@@ -3,6 +3,7 @@ import {
   completeDeferredInteraction,
   editDeferredInteraction,
 } from "../discord/interaction-followup.js";
+import { isDiscordCircuitOpen } from "../discord/discord-circuit.js";
 import {
   deferredEphemeral,
   deferredMessage,
@@ -74,11 +75,13 @@ async function runStartAndFollowUpInner(
     }
 
     const target = configRowToTarget(row);
-    await editDeferredInteraction(
-      applicationId,
-      interactionToken,
-      "Posting reminder…",
-    );
+    if (!isDiscordCircuitOpen()) {
+      await editDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "Posting reminder…",
+      );
+    }
 
     console.log(`[standup/start] guild ${guildId} posting reminder`);
     const { usedRoleMention } = await runDailyReminder(config, target);
