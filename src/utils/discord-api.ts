@@ -2,6 +2,9 @@ const DISCORD_API_BASE = "https://discord.com/api/v10";
 const MAX_RETRIES = 3;
 const MAX_GLOBAL_RETRIES = 6;
 const DISCORD_FETCH_TIMEOUT_MS = 30_000;
+const DISCORD_FETCH_MAX_WALL_CLOCK_MS = 60_000;
+const CLOUDFLARE_1015_MESSAGE =
+  "Discord is rate-limiting this server IP (Cloudflare 1015). Try again in a few minutes.";
 
 interface DiscordRateLimitBody {
   retry_after?: number;
@@ -34,6 +37,9 @@ export function formatUserFacingDiscordError(
   context: DiscordErrorContext = "members",
 ): string {
   if (error instanceof DiscordApiError) {
+    if (error.status === 429 && error.message.includes("Cloudflare 1015")) {
+      return error.message;
+    }
     if (error.status === 403) {
       const body = error.body as DiscordErrorBody | undefined;
       const codeSuffix =
@@ -88,6 +94,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isCloudflareHtmlBody(text: string): boolean {
+  const lower = text.trimStart().toLowerCase();
+  return lower.startsWith("<!doctype") || lower.includes("error 1015");
+}
+
+function isCloudflareRateLimitResponse(
+  status: number,
+  bodyText: string,
+  contentType: string | null,
+): boolean {
+  if (status !== 429) return false;
+  if (contentType?.includes("text/html")) return true;
+  return isCloudflareHtmlBody(bodyText);
+}
+
 export async function discordFetch(
   token: string,
   path: string,
@@ -96,8 +117,16 @@ export async function discordFetch(
   const url = path.startsWith("http") ? path : `${DISCORD_API_BASE}${path}`;
 
   const isMultipart = init?.body instanceof FormData;
+  const startedAt = Date.now();
 
   for (let attempt = 0; ; attempt++) {
+    if (Date.now() - startedAt >= DISCORD_FETCH_MAX_WALL_CLOCK_MS) {
+      throw new DiscordApiError(
+        "Discord API requests exceeded time limit (rate limits). Try again in a few minutes.",
+        429,
+      );
+    }
+
     const timeoutSignal = AbortSignal.timeout(DISCORD_FETCH_TIMEOUT_MS);
     const userSignal = init?.signal;
     const signal =
@@ -116,10 +145,17 @@ export async function discordFetch(
     });
 
     if (response.status === 429) {
+      const contentType = response.headers.get("content-type");
+      const bodyText = await response.clone().text();
+
+      if (isCloudflareRateLimitResponse(response.status, bodyText, contentType)) {
+        throw new DiscordApiError(CLOUDFLARE_1015_MESSAGE, 429, bodyText.slice(0, 300));
+      }
+
       let retryAfterMs = 1000;
       let isGlobal = false;
       try {
-        const body = (await response.clone().json()) as DiscordRateLimitBody;
+        const body = JSON.parse(bodyText) as DiscordRateLimitBody;
         if (typeof body.retry_after === "number") {
           retryAfterMs = Math.ceil(body.retry_after * 1000);
         }
@@ -131,7 +167,12 @@ export async function discordFetch(
 
       const maxRetries = isGlobal ? MAX_GLOBAL_RETRIES : MAX_RETRIES;
       if (attempt < maxRetries) {
-        await sleep(retryAfterMs);
+        const remaining = DISCORD_FETCH_MAX_WALL_CLOCK_MS - (Date.now() - startedAt);
+        const waitMs = Math.min(retryAfterMs, remaining);
+        if (waitMs <= 0) {
+          return response;
+        }
+        await sleep(waitMs);
         continue;
       }
     }

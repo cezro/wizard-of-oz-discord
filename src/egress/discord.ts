@@ -378,10 +378,23 @@ async function postChannelMessage(
   channelId: string,
   body: ChannelMessageBody,
 ): Promise<void> {
-  await discordJson(config.discordBotToken, `/channels/${channelId}/messages`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  const started = Date.now();
+  console.log(`[discord/post] channel ${channelId} POST started`);
+  try {
+    await discordJson(config.discordBotToken, `/channels/${channelId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    console.log(
+      `[discord/post] channel ${channelId} POST done in ${Date.now() - started}ms`,
+    );
+  } catch (error) {
+    console.error(
+      `[discord/post] channel ${channelId} POST failed after ${Date.now() - started}ms:`,
+      error instanceof Error ? error.message : error,
+    );
+    throw error;
+  }
 }
 
 async function postComponentsV2Message(
