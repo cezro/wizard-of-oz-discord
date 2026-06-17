@@ -1,5 +1,8 @@
 import type { AppConfig } from "../config.js";
-import { editDeferredInteraction } from "../discord/interaction-followup.js";
+import {
+  completeDeferredInteraction,
+  editDeferredInteraction,
+} from "../discord/interaction-followup.js";
 import {
   deferredEphemeral,
   deferredMessage,
@@ -15,11 +18,12 @@ import { runPipeline, type RunPipelineOptions } from "../pipeline.js";
 import { runMissingReporterNudge } from "../standup/missing-reporters.js";
 import { runDailyReminder } from "../standup/reminder.js";
 import { configRowToTarget, getConfig } from "../storage/config-store.js";
-import type { InvalidCheckIn, StandupTarget } from "../types.js";
+import type { InvalidCheckIn } from "../types.js";
 import { formatUserFacingDiscordError } from "../utils/discord-api.js";
 import {
   getCalendarDayWindow,
   resolveSummarizeDateParts,
+  type SummarizeDateParts,
 } from "../utils/timezone.js";
 import { withTimeout } from "../utils/with-timeout.js";
 
@@ -43,7 +47,7 @@ async function runStartAndFollowUp(
       `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
     );
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       error instanceof Error ? error.message : "Something went wrong.",
@@ -61,7 +65,7 @@ async function runStartAndFollowUpInner(
     console.log(`[standup/start] guild ${guildId} loading config`);
     const row = await getConfig(config, guildId);
     if (!row) {
-      await editDeferredInteraction(
+      await completeDeferredInteraction(
         applicationId,
         interactionToken,
         "No configuration yet. Run `/standup-config` first.",
@@ -70,20 +74,26 @@ async function runStartAndFollowUpInner(
     }
 
     const target = configRowToTarget(row);
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      "Posting reminder…",
+    );
+
     console.log(`[standup/start] guild ${guildId} posting reminder`);
     const { usedRoleMention } = await runDailyReminder(config, target);
     const pingNote = usedRoleMention
       ? " Mentioned the reporter role."
       : " No reporter role configured — text only.";
 
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       `Daily DSM reminder posted to <#${row.channel_id}>.${pingNote} (Cron \`last_reminder_date\` was not updated.)`,
     );
     console.log(`[standup/start] guild ${guildId} done`);
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       formatUserFacingDiscordError(error),
@@ -95,9 +105,9 @@ async function runSummarizeAndFollowUp(
   config: AppConfig,
   applicationId: string,
   interactionToken: string,
-  target: StandupTarget,
-  timezone: string,
-  pipelineOptions: RunPipelineOptions,
+  guildId: string,
+  channelId: string,
+  dateOptions: SummarizeDateParts,
 ): Promise<void> {
   try {
     await withTimeout(
@@ -105,20 +115,21 @@ async function runSummarizeAndFollowUp(
         config,
         applicationId,
         interactionToken,
-        target,
-        timezone,
-        pipelineOptions,
+        guildId,
+        channelId,
+        dateOptions,
       ),
       COMMAND_FOLLOWUP_TIMEOUT_MS,
       `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
     );
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       error instanceof Error
         ? error.message
         : formatUserFacingDiscordError(error, "channel"),
+      { ephemeral: false },
     );
   }
 }
@@ -127,31 +138,63 @@ async function runSummarizeAndFollowUpInner(
   config: AppConfig,
   applicationId: string,
   interactionToken: string,
-  target: StandupTarget,
-  timezone: string,
-  pipelineOptions: RunPipelineOptions,
+  guildId: string,
+  channelId: string,
+  dateOptions: SummarizeDateParts,
 ): Promise<void> {
   try {
-    console.log(`[standup/summarize] guild ${target.guildId} running pipeline`);
+    console.log(`[standup/summarize] guild ${guildId} loading config`);
+    const row = await getConfig(config, guildId);
+    if (!row) {
+      await completeDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "No configuration yet. Run `/standup-config` first.",
+        { ephemeral: false },
+      );
+      return;
+    }
+
+    const resolved = resolveSummarizeDateParts(row.timezone, dateOptions);
+    if (!resolved.ok) {
+      await completeDeferredInteraction(
+        applicationId,
+        interactionToken,
+        resolved.error,
+        { ephemeral: false },
+      );
+      return;
+    }
+
+    const target = configRowToTarget(row);
+    const pipelineOptions: RunPipelineOptions = {
+      window: getCalendarDayWindow(row.timezone, resolved.dateString),
+      summaryDate: resolved.dateString,
+      broadcastChannelId: channelId,
+    };
+
+    console.log(`[standup/summarize] guild ${guildId} running pipeline`);
     const result = await runPipeline(config, target, pipelineOptions);
     const lines = [
       "Summary pipeline completed.",
-      `**Date:** ${pipelineOptions.summaryDate} (\`${timezone}\`)`,
+      `**Date:** ${pipelineOptions.summaryDate} (\`${row.timezone}\`)`,
       `**Messages ingested:** ${result.messageCount}`,
       `**Posted:** ${result.posted}`,
       `**Channel:** <#${result.channelId}>`,
     ];
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       lines.join("\n"),
+      { ephemeral: false },
     );
-    console.log(`[standup/summarize] guild ${target.guildId} done`);
+    console.log(`[standup/summarize] guild ${guildId} done`);
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       formatUserFacingDiscordError(error, "channel"),
+      { ephemeral: false },
     );
   }
 }
@@ -160,7 +203,7 @@ async function runRemindMissingAndFollowUp(
   config: AppConfig,
   applicationId: string,
   interactionToken: string,
-  target: StandupTarget,
+  guildId: string,
 ): Promise<void> {
   try {
     await withTimeout(
@@ -168,13 +211,13 @@ async function runRemindMissingAndFollowUp(
         config,
         applicationId,
         interactionToken,
-        target,
+        guildId,
       ),
       COMMAND_FOLLOWUP_TIMEOUT_MS,
       `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
     );
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       error instanceof Error
@@ -188,19 +231,40 @@ async function runRemindMissingAndFollowUpInner(
   config: AppConfig,
   applicationId: string,
   interactionToken: string,
-  target: StandupTarget,
+  guildId: string,
 ): Promise<void> {
   try {
-    console.log(`[standup/remind-missing] guild ${target.guildId} running nudge`);
+    console.log(`[standup/remind-missing] guild ${guildId} loading config`);
+    const row = await getConfig(config, guildId);
+    if (!row) {
+      await completeDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "No configuration yet. Run `/standup-config` first.",
+      );
+      return;
+    }
+
+    if (!row.reporter_role_id) {
+      await completeDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "No reporter role configured. Set one in `/standup-config` → Reporter role.",
+      );
+      return;
+    }
+
+    const target = configRowToTarget(row);
+    console.log(`[standup/remind-missing] guild ${guildId} running nudge`);
     const result = await runMissingReporterNudge(config, target);
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       formatRemindMissingReply(result, target.channelId),
     );
-    console.log(`[standup/remind-missing] guild ${target.guildId} done`);
+    console.log(`[standup/remind-missing] guild ${guildId} done`);
   } catch (error) {
-    await editDeferredInteraction(
+    await completeDeferredInteraction(
       applicationId,
       interactionToken,
       formatUserFacingDiscordError(error),
@@ -293,19 +357,6 @@ export async function handleStandupCommand(
       }
 
       case "remind-missing": {
-        const row = await getConfig(config, guildId);
-        if (!row) {
-          return ephemeral(
-            "No configuration yet. Run `/standup-config` first.",
-          );
-        }
-
-        if (!row.reporter_role_id) {
-          return ephemeral(
-            "No reporter role configured. Set one in `/standup-config` → Reporter role.",
-          );
-        }
-
         const token = interaction.token;
         if (!token) {
           return ephemeral("Missing interaction token; try again.");
@@ -313,35 +364,18 @@ export async function handleStandupCommand(
 
         const applicationId =
           interaction.application_id ?? config.discordApplicationId;
-        const target = configRowToTarget(row);
 
         void runRemindMissingAndFollowUp(
           config,
           applicationId,
           token,
-          target,
+          guildId,
         );
 
         return deferredEphemeral();
       }
 
       case "summarize": {
-        const row = await getConfig(config, guildId);
-        if (!row) {
-          return ephemeral(
-            "No configuration yet. Run `/standup-config` first.",
-          );
-        }
-
-        const resolved = resolveSummarizeDateParts(row.timezone, {
-          month: getSubcommandIntegerOption(interaction, "month"),
-          day: getSubcommandIntegerOption(interaction, "day"),
-          year: getSubcommandIntegerOption(interaction, "year"),
-        });
-        if (!resolved.ok) {
-          return ephemeral(resolved.error);
-        }
-
         const channelId = interaction.channel_id;
         if (!channelId) {
           return ephemeral("Missing channel context; try again in a server channel.");
@@ -354,19 +388,17 @@ export async function handleStandupCommand(
 
         const applicationId =
           interaction.application_id ?? config.discordApplicationId;
-        const target = configRowToTarget(row);
-        const window = getCalendarDayWindow(row.timezone, resolved.dateString);
 
         void runSummarizeAndFollowUp(
           config,
           applicationId,
           token,
-          target,
-          row.timezone,
+          guildId,
+          channelId,
           {
-            window,
-            summaryDate: resolved.dateString,
-            broadcastChannelId: channelId,
+            month: getSubcommandIntegerOption(interaction, "month"),
+            day: getSubcommandIntegerOption(interaction, "day"),
+            year: getSubcommandIntegerOption(interaction, "year"),
           },
         );
 
