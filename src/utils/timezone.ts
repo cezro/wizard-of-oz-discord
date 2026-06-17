@@ -92,6 +92,28 @@ export function matchesSchedule(
   return hour === targetHour && minute === targetMinute;
 }
 
+/**
+ * Exact minute match, or up to `graceMinutes` after the scheduled minute.
+ * Recovers when the previous minute's tick was skipped due to mutex contention.
+ */
+export function matchesScheduleWithGrace(
+  hour: number,
+  minute: number,
+  targetHour: number,
+  targetMinute: number,
+  graceMinutes = 1,
+): boolean {
+  if (matchesSchedule(hour, minute, targetHour, targetMinute)) {
+    return true;
+  }
+  if (graceMinutes <= 0) return false;
+
+  const nowTotal = hour * 60 + minute;
+  const targetTotal = targetHour * 60 + targetMinute;
+  const diff = nowTotal - targetTotal;
+  return diff > 0 && diff <= graceMinutes;
+}
+
 export function formatScheduleTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }

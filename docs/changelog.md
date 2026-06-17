@@ -53,3 +53,16 @@ After deploy, confirm Render logs show `[discord/interactions] command=standup s
 
 - **Supabase `ws` transport restored** — Removing `realtime: { transport: ws }` broke `createClient` on Node 20 (`Node.js 20 detected without native WebSocket support`), so every tick and `/standup start` failed at `getEnabledConfigs`.
 - **`editDeferredInteraction` crash** — On webhook PATCH failure, `response.json()` then `response.text()` threw `Body is unusable` and **killed the process**. Fixed by reading the body once; errors are logged, not thrown.
+
+### Stuck-bot implementation (audit plan)
+
+Full write-up: [`docs/audit/2026-06-17-stuck-bot.md`](audit/2026-06-17-stuck-bot.md)
+
+| Change | Files |
+|--------|-------|
+| Daily reminder uses role mention (no member pagination) | `src/standup/reminder.ts`, `src/egress/discord.ts` |
+| 90s timeout + step logs on deferred `/standup` commands | `src/commands/standup.ts` |
+| Gateway opcode 8 chunk requests + `GUILD_MEMBERS_CHUNK` fix | `src/discord/gateway.ts` |
+| Member REST: 45s timeout, 20-page cap, cache hit/miss logs | `src/discord/guild-members.ts` |
+| Removed startup duplicate tick; tick started/finished logs | `src/cron/internal-scheduler.ts`, `src/cron/standup-tick.ts` |
+| 1-minute schedule grace window for reminder/nudge/summary | `src/utils/timezone.ts`, `src/cron/standup-tick.ts` |

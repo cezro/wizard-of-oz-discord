@@ -45,6 +45,7 @@ interface DiscordEmbed {
 interface AllowedMentions {
   parse?: ("users" | "roles" | "everyone")[];
   users?: string[];
+  roles?: string[];
 }
 
 interface ChannelMessageBody {
@@ -115,6 +116,21 @@ export async function broadcastReminder(
       },
     });
   }
+}
+
+/** Pings everyone with the reporter role in one message (no member list fetch). */
+export async function broadcastReminderWithRole(
+  config: AppConfig,
+  channelId: string,
+  roleId: string,
+): Promise<void> {
+  await postChannelMessage(config, channelId, {
+    content: `${REMINDER_MESSAGE}\n\n<@&${roleId}>`,
+    allowed_mentions: {
+      parse: [],
+      roles: [roleId],
+    },
+  });
 }
 
 export async function broadcastMissingReporterNudge(

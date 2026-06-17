@@ -26,7 +26,7 @@ import { withTimeout } from "../utils/with-timeout.js";
 import {
   getCalendarDayWindow,
   getLocalTimeParts,
-  matchesSchedule,
+  matchesScheduleWithGrace,
   resolveNudgeSchedule,
 } from "../utils/timezone.js";
 
@@ -163,11 +163,14 @@ export async function runStandupTick(
       tickInFlight = null;
       tickStartedAt = 0;
     } else {
-      console.warn("[cron/standup] tick skipped, previous still running");
+      console.warn(
+        `[cron/standup] tick skipped, previous still running (${Math.round(elapsed / 1000)}s elapsed)`,
+      );
       return { results: [], skipped: true };
     }
   }
 
+  console.log("[cron/standup] tick started");
   tickStartedAt = Date.now();
   const run = runStandupTickInner(config, now).finally(() => {
     tickInFlight = null;
@@ -277,7 +280,7 @@ async function processGuildTick(
 
   if (
     target.reminderHour !== null &&
-    matchesSchedule(
+    matchesScheduleWithGrace(
       local.hour,
       local.minute,
       target.reminderHour,
@@ -304,7 +307,7 @@ async function processGuildTick(
   const nudgeSchedule = resolveNudgeSchedule(target);
   if (
     target.reporterRoleId &&
-    matchesSchedule(
+    matchesScheduleWithGrace(
       local.hour,
       local.minute,
       nudgeSchedule.hour,
@@ -332,7 +335,7 @@ async function processGuildTick(
   }
 
   if (
-    matchesSchedule(
+    matchesScheduleWithGrace(
       local.hour,
       local.minute,
       target.summaryHour,

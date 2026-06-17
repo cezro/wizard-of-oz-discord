@@ -21,6 +21,9 @@ import {
   getCalendarDayWindow,
   resolveSummarizeDateParts,
 } from "../utils/timezone.js";
+import { withTimeout } from "../utils/with-timeout.js";
+
+const COMMAND_FOLLOWUP_TIMEOUT_MS = 90_000;
 
 async function runStartAndFollowUp(
   config: AppConfig,
@@ -29,6 +32,33 @@ async function runStartAndFollowUp(
   guildId: string,
 ): Promise<void> {
   try {
+    await withTimeout(
+      runStartAndFollowUpInner(
+        config,
+        applicationId,
+        interactionToken,
+        guildId,
+      ),
+      COMMAND_FOLLOWUP_TIMEOUT_MS,
+      `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
+    );
+  } catch (error) {
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      error instanceof Error ? error.message : "Something went wrong.",
+    );
+  }
+}
+
+async function runStartAndFollowUpInner(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  guildId: string,
+): Promise<void> {
+  try {
+    console.log(`[standup/start] guild ${guildId} loading config`);
     const row = await getConfig(config, guildId);
     if (!row) {
       await editDeferredInteraction(
@@ -40,17 +70,18 @@ async function runStartAndFollowUp(
     }
 
     const target = configRowToTarget(row);
-    const { pingedCount } = await runDailyReminder(config, target);
-    const pingNote =
-      pingedCount > 0
-        ? ` Pinged **${pingedCount}** reporter(s).`
-        : " No reporter role configured — text only.";
+    console.log(`[standup/start] guild ${guildId} posting reminder`);
+    const { usedRoleMention } = await runDailyReminder(config, target);
+    const pingNote = usedRoleMention
+      ? " Mentioned the reporter role."
+      : " No reporter role configured — text only.";
 
     await editDeferredInteraction(
       applicationId,
       interactionToken,
       `Daily DSM reminder posted to <#${row.channel_id}>.${pingNote} (Cron \`last_reminder_date\` was not updated.)`,
     );
+    console.log(`[standup/start] guild ${guildId} done`);
   } catch (error) {
     await editDeferredInteraction(
       applicationId,
@@ -69,6 +100,39 @@ async function runSummarizeAndFollowUp(
   pipelineOptions: RunPipelineOptions,
 ): Promise<void> {
   try {
+    await withTimeout(
+      runSummarizeAndFollowUpInner(
+        config,
+        applicationId,
+        interactionToken,
+        target,
+        timezone,
+        pipelineOptions,
+      ),
+      COMMAND_FOLLOWUP_TIMEOUT_MS,
+      `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
+    );
+  } catch (error) {
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      error instanceof Error
+        ? error.message
+        : formatUserFacingDiscordError(error, "channel"),
+    );
+  }
+}
+
+async function runSummarizeAndFollowUpInner(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  target: StandupTarget,
+  timezone: string,
+  pipelineOptions: RunPipelineOptions,
+): Promise<void> {
+  try {
+    console.log(`[standup/summarize] guild ${target.guildId} running pipeline`);
     const result = await runPipeline(config, target, pipelineOptions);
     const lines = [
       "Summary pipeline completed.",
@@ -82,6 +146,7 @@ async function runSummarizeAndFollowUp(
       interactionToken,
       lines.join("\n"),
     );
+    console.log(`[standup/summarize] guild ${target.guildId} done`);
   } catch (error) {
     await editDeferredInteraction(
       applicationId,
@@ -98,12 +163,42 @@ async function runRemindMissingAndFollowUp(
   target: StandupTarget,
 ): Promise<void> {
   try {
+    await withTimeout(
+      runRemindMissingAndFollowUpInner(
+        config,
+        applicationId,
+        interactionToken,
+        target,
+      ),
+      COMMAND_FOLLOWUP_TIMEOUT_MS,
+      `Timed out after ${COMMAND_FOLLOWUP_TIMEOUT_MS / 1000}s — check Render logs`,
+    );
+  } catch (error) {
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      error instanceof Error
+        ? error.message
+        : formatUserFacingDiscordError(error),
+    );
+  }
+}
+
+async function runRemindMissingAndFollowUpInner(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  target: StandupTarget,
+): Promise<void> {
+  try {
+    console.log(`[standup/remind-missing] guild ${target.guildId} running nudge`);
     const result = await runMissingReporterNudge(config, target);
     await editDeferredInteraction(
       applicationId,
       interactionToken,
       formatRemindMissingReply(result, target.channelId),
     );
+    console.log(`[standup/remind-missing] guild ${target.guildId} done`);
   } catch (error) {
     await editDeferredInteraction(
       applicationId,

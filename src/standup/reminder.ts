@@ -1,10 +1,13 @@
 import type { AppConfig } from "../config.js";
-import { broadcastReminder } from "../egress/discord.js";
+import {
+  broadcastReminder,
+  broadcastReminderWithRole,
+} from "../egress/discord.js";
 import type { StandupTarget } from "../types.js";
-import { getExpectedReporterIds } from "./missing-reporters.js";
 
 export interface DailyReminderResult {
   pingedCount: number;
+  usedRoleMention?: boolean;
 }
 
 export async function runDailyReminder(
@@ -16,13 +19,11 @@ export async function runDailyReminder(
     return { pingedCount: 0 };
   }
 
-  const reporterUserIds = await getExpectedReporterIds(
+  await broadcastReminderWithRole(
     config,
-    target.guildId,
+    target.channelId,
     target.reporterRoleId,
   );
 
-  await broadcastReminder(config, target.channelId, reporterUserIds);
-
-  return { pingedCount: reporterUserIds.length };
+  return { pingedCount: 0, usedRoleMention: true };
 }

@@ -2,7 +2,6 @@ import type { AppConfig } from "../config.js";
 import { runStandupTick } from "./standup-tick.js";
 
 const TICK_MS = 60_000;
-const STARTUP_TICK_DELAY_MS = 3_000;
 
 /** Default on unless explicitly disabled (false / 0 / no). */
 export function isInternalSchedulerEnabled(): boolean {
@@ -11,9 +10,16 @@ export function isInternalSchedulerEnabled(): boolean {
 }
 
 function runTick(config: AppConfig): void {
-  runStandupTick(config).catch((error) => {
-    console.error("[scheduler/standup]", error);
-  });
+  const startedAt = Date.now();
+  runStandupTick(config)
+    .then((result) => {
+      const elapsed = Date.now() - startedAt;
+      if (result.skipped) return;
+      console.log(`[cron/standup] tick finished in ${elapsed}ms`);
+    })
+    .catch((error) => {
+      console.error("[scheduler/standup]", error);
+    });
 }
 
 /**
@@ -21,8 +27,6 @@ function runTick(config: AppConfig): void {
  * Returns a stop function for graceful shutdown.
  */
 export function startInternalScheduler(config: AppConfig): () => void {
-  const startupTimer = setTimeout(() => runTick(config), STARTUP_TICK_DELAY_MS);
-
   const msUntilNextMinute = TICK_MS - (Date.now() % TICK_MS);
   let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -36,7 +40,6 @@ export function startInternalScheduler(config: AppConfig): () => void {
   );
 
   return () => {
-    clearTimeout(startupTimer);
     clearTimeout(alignTimer);
     if (interval) clearInterval(interval);
   };

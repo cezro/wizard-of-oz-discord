@@ -3,6 +3,7 @@ import WebSocket from "ws";
 import {
   clearMemberCache,
   ingestGuildMembersChunk,
+  isGuildMemberCacheReady,
   removeGuildMember,
   upsertGuildMember,
 } from "./member-cache.js";
@@ -12,11 +13,13 @@ const GUILDS_INTENT = 1 << 0;
 const GUILD_MEMBERS_INTENT = 1 << 1;
 const GATEWAY_INTENTS = GUILDS_INTENT | GUILD_MEMBERS_INTENT;
 const MAX_RECONNECT_DELAY_MS = 30_000;
+const CHUNK_REQUEST_INTERVAL_MS = 5_000;
 
 const Opcodes = {
   Dispatch: 0,
   Heartbeat: 1,
   Identify: 2,
+  RequestGuildMembers: 8,
   Resume: 6,
   Reconnect: 7,
   InvalidSession: 9,
@@ -53,6 +56,11 @@ interface GuildMemberEventData {
   roles: string[];
 }
 
+interface GuildCreateData {
+  id: string;
+  unavailable?: boolean;
+}
+
 export function startDiscordGateway(token: string): () => void {
   let ws: WebSocket | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -61,6 +69,9 @@ export function startDiscordGateway(token: string): () => void {
   let intentionalClose = false;
   let reconnectAttempts = 0;
   let hadDisconnect = false;
+  const chunkQueue: string[] = [];
+  const chunkQueued = new Set<string>();
+  let chunkDrainTimer: ReturnType<typeof setTimeout> | null = null;
 
   function clearHeartbeat(): void {
     if (heartbeatTimer) {
@@ -75,8 +86,49 @@ export function startDiscordGateway(token: string): () => void {
     }
   }
 
+  function requestMemberChunk(guildId: string): void {
+    console.log(`[gateway] requested member chunk for guild ${guildId}`);
+    send({
+      op: Opcodes.RequestGuildMembers,
+      d: {
+        guild_id: guildId,
+        query: "",
+        limit: 0,
+      },
+    });
+  }
+
+  function enqueueMemberChunkRequest(guildId: string): void {
+    if (chunkQueued.has(guildId) || isGuildMemberCacheReady(guildId)) {
+      return;
+    }
+    chunkQueued.add(guildId);
+    chunkQueue.push(guildId);
+    if (!chunkDrainTimer) {
+      chunkDrainTimer = setTimeout(drainChunkQueue, 0);
+    }
+  }
+
+  function drainChunkQueue(): void {
+    chunkDrainTimer = null;
+    const guildId = chunkQueue.shift();
+    if (!guildId) return;
+
+    requestMemberChunk(guildId);
+
+    if (chunkQueue.length > 0) {
+      chunkDrainTimer = setTimeout(drainChunkQueue, CHUNK_REQUEST_INTERVAL_MS);
+    }
+  }
+
   function identify(): void {
     clearMemberCache();
+    chunkQueue.length = 0;
+    chunkQueued.clear();
+    if (chunkDrainTimer) {
+      clearTimeout(chunkDrainTimer);
+      chunkDrainTimer = null;
+    }
     send({
       op: Opcodes.Identify,
       d: {
@@ -140,7 +192,14 @@ export function startDiscordGateway(token: string): () => void {
         }
         break;
       }
-      case "GUILD_MEMBERS": {
+      case "GUILD_CREATE": {
+        const guild = data as GuildCreateData;
+        if (!guild.unavailable) {
+          enqueueMemberChunkRequest(guild.id);
+        }
+        break;
+      }
+      case "GUILD_MEMBERS_CHUNK": {
         const chunk = data as GuildMembersChunkData;
         ingestGuildMembersChunk(
           chunk.guild_id,
@@ -148,6 +207,11 @@ export function startDiscordGateway(token: string): () => void {
           chunk.chunk_index,
           chunk.chunk_count,
         );
+        if (isGuildMemberCacheReady(chunk.guild_id)) {
+          console.log(
+            `[gateway] member cache ready for guild ${chunk.guild_id}`,
+          );
+        }
         break;
       }
       case "GUILD_MEMBER_ADD":
@@ -238,6 +302,7 @@ export function startDiscordGateway(token: string): () => void {
   return () => {
     intentionalClose = true;
     clearHeartbeat();
+    if (chunkDrainTimer) clearTimeout(chunkDrainTimer);
     ws?.close();
   };
 }
