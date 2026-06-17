@@ -46,6 +46,7 @@ function rowToTarget(row: StandupConfigRow): StandupTarget {
     nudgeMinute: row.nudge_minute,
     lastNudgeDate: row.last_nudge_date,
     activeWeekdays: normalizeActiveWeekdays(row.active_weekdays),
+    accessFailureCount: row.access_failure_count ?? 0,
   };
 }
 
@@ -317,4 +318,65 @@ export async function markNudgeSent(
 
 export function configRowToTarget(row: StandupConfigRow): StandupTarget {
   return rowToTarget(row);
+}
+
+export async function recordGuildAccessFailure(
+  config: AppConfig,
+  guildId: string,
+): Promise<number> {
+  const existing = await getConfig(config, guildId);
+  const nextCount = (existing?.access_failure_count ?? 0) + 1;
+
+  const supabase = getSupabase(config);
+  const { error } = await supabase
+    .from("standup_config")
+    .update({
+      access_failure_count: nextCount,
+      last_access_failure_at: new Date().toISOString(),
+    })
+    .eq("guild_id", guildId);
+
+  if (error) {
+    throw new Error(`Failed to record access failure: ${error.message}`);
+  }
+
+  return nextCount;
+}
+
+export async function resetGuildAccessFailures(
+  config: AppConfig,
+  guildId: string,
+): Promise<void> {
+  const supabase = getSupabase(config);
+  const { error } = await supabase
+    .from("standup_config")
+    .update({
+      access_failure_count: 0,
+      last_access_failure_at: null,
+    })
+    .eq("guild_id", guildId);
+
+  if (error) {
+    throw new Error(`Failed to reset access failures: ${error.message}`);
+  }
+}
+
+export async function disableGuildConfig(
+  config: AppConfig,
+  guildId: string,
+  reason: string,
+): Promise<void> {
+  const supabase = getSupabase(config);
+  const { error } = await supabase
+    .from("standup_config")
+    .update({
+      enabled: false,
+      updated_at: new Date().toISOString(),
+      updated_by: reason,
+    })
+    .eq("guild_id", guildId);
+
+  if (error) {
+    throw new Error(`Failed to disable guild config: ${error.message}`);
+  }
 }
