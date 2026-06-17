@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 import type { AppConfig } from "../config.js";
 
@@ -30,6 +31,8 @@ export function getSupabase(config: AppConfig): SupabaseClient {
   if (!client) {
     client = createClient(config.supabaseUrl, config.supabaseSecretKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      // Node 20 on Render has no native WebSocket; required for client init.
+      realtime: { transport: ws as never },
     });
   }
   return client;

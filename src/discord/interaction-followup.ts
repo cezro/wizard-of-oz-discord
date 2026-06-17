@@ -6,23 +6,29 @@ export async function editDeferredInteraction(
   content: string,
 ): Promise<void> {
   const url = `${DISCORD_API_BASE}/webhooks/${applicationId}/${interactionToken}/messages/@original`;
-  const response = await fetch(url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
 
-  if (!response.ok) {
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      body = await response.text();
+  try {
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: content.slice(0, 2000) }),
+    });
+
+    if (!response.ok) {
+      const bodyText = await response.text();
+      let body: unknown = bodyText;
+      try {
+        body = JSON.parse(bodyText);
+      } catch {
+        // keep raw text
+      }
+      console.error(
+        "[discord/interaction-followup] edit failed:",
+        response.status,
+        body,
+      );
     }
-    console.error(
-      "[discord/interaction-followup] edit failed:",
-      response.status,
-      body,
-    );
+  } catch (error) {
+    console.error("[discord/interaction-followup] edit error:", error);
   }
 }

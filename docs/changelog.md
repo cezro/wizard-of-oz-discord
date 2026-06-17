@@ -44,7 +44,12 @@ Guild `751138389507702844` has been failing since **2026-06-10** with `Unknown G
 - **`getEnabledConfigs` hung at tick start** — Ran before per-guild timeouts; a stuck Supabase call blocked the mutex for hours. Added **15s Supabase load timeout**.
 - **Mutex force-release (5 min)** — Clears `tickInFlight` even if the inner promise never settles.
 - **Whole-tick timeout (5 min)** + **Gemini timeout (90s)**.
-- **Removed Supabase Realtime WebSocket** — Unused; dropped `ws` transport from the client.
+- **Removed Supabase Realtime WebSocket** — Unused for this service; the `ws` transport could hold connections open unnecessarily.
 - **Migration 005 fallback** — Access-failure counters no-op with a warning if columns are missing.
 
 After deploy, confirm Render logs show `[discord/interactions] command=standup sub=start` when you run the command. If that line never appears, Discord is not reaching your Interactions Endpoint URL.
+
+### Regression fix (07:52 deploy)
+
+- **Supabase `ws` transport restored** — Removing `realtime: { transport: ws }` broke `createClient` on Node 20 (`Node.js 20 detected without native WebSocket support`), so every tick and `/standup start` failed at `getEnabledConfigs`.
+- **`editDeferredInteraction` crash** — On webhook PATCH failure, `response.json()` then `response.text()` threw `Body is unusable` and **killed the process**. Fixed by reading the body once; errors are logged, not thrown.
