@@ -37,3 +37,14 @@ Guild `751138389507702844` has been failing since **2026-06-10** with `Unknown G
 ### References
 
 - Log excerpt: [`docs/references/render-summarizer-logs-6-17-2026-1351.md`](references/render-summarizer-logs-6-17-2026-1351.md)
+
+### Follow-up fixes (deploy required)
+
+- **`/standup start` timed out** — Handler awaited `getConfig` + `runDailyReminder` before replying. Fixed: **defer immediately** (no awaits before defer), then load config and post in background.
+- **`getEnabledConfigs` hung at tick start** — Ran before per-guild timeouts; a stuck Supabase call blocked the mutex for hours. Added **15s Supabase load timeout**.
+- **Mutex force-release (5 min)** — Clears `tickInFlight` even if the inner promise never settles.
+- **Whole-tick timeout (5 min)** + **Gemini timeout (90s)**.
+- **Removed Supabase Realtime WebSocket** — Unused; dropped `ws` transport from the client.
+- **Migration 005 fallback** — Access-failure counters no-op with a warning if columns are missing.
+
+After deploy, confirm Render logs show `[discord/interactions] command=standup sub=start` when you run the command. If that line never appears, Discord is not reaching your Interactions Endpoint URL.

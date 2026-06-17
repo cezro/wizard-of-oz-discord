@@ -324,40 +324,59 @@ export async function recordGuildAccessFailure(
   config: AppConfig,
   guildId: string,
 ): Promise<number> {
-  const existing = await getConfig(config, guildId);
-  const nextCount = (existing?.access_failure_count ?? 0) + 1;
+  try {
+    const existing = await getConfig(config, guildId);
+    const nextCount = (existing?.access_failure_count ?? 0) + 1;
 
-  const supabase = getSupabase(config);
-  const { error } = await supabase
-    .from("standup_config")
-    .update({
-      access_failure_count: nextCount,
-      last_access_failure_at: new Date().toISOString(),
-    })
-    .eq("guild_id", guildId);
+    const supabase = getSupabase(config);
+    const { error } = await supabase
+      .from("standup_config")
+      .update({
+        access_failure_count: nextCount,
+        last_access_failure_at: new Date().toISOString(),
+      })
+      .eq("guild_id", guildId);
 
-  if (error) {
-    throw new Error(`Failed to record access failure: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to record access failure: ${error.message}`);
+    }
+
+    return nextCount;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("access_failure_count")) {
+      console.warn(
+        "[config-store] access_failure_count column missing — run migration 005",
+      );
+      return 0;
+    }
+    throw error;
   }
-
-  return nextCount;
 }
 
 export async function resetGuildAccessFailures(
   config: AppConfig,
   guildId: string,
 ): Promise<void> {
-  const supabase = getSupabase(config);
-  const { error } = await supabase
-    .from("standup_config")
-    .update({
-      access_failure_count: 0,
-      last_access_failure_at: null,
-    })
-    .eq("guild_id", guildId);
+  try {
+    const supabase = getSupabase(config);
+    const { error } = await supabase
+      .from("standup_config")
+      .update({
+        access_failure_count: 0,
+        last_access_failure_at: null,
+      })
+      .eq("guild_id", guildId);
 
-  if (error) {
-    throw new Error(`Failed to reset access failures: ${error.message}`);
+    if (error) {
+      throw new Error(`Failed to reset access failures: ${error.message}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("access_failure_count")) {
+      return;
+    }
+    throw error;
   }
 }
 

@@ -22,6 +22,7 @@ import {
   formatUserFacingDiscordError,
 } from "../utils/discord-api.js";
 import { isActiveWeekday } from "../utils/weekdays.js";
+import { withTimeout } from "../utils/with-timeout.js";
 import {
   getCalendarDayWindow,
   getLocalTimeParts,
@@ -48,9 +49,14 @@ export interface StandupTickResult {
 }
 
 let tickInFlight: Promise<StandupTickResult> | null = null;
+let tickStartedAt = 0;
 
 const INTER_GUILD_STAGGER_MS = 2000;
 const GUILD_TICK_TIMEOUT_MS = 120_000;
+const STANDUP_TICK_TIMEOUT_MS = 300_000;
+/** Force-release mutex if inner tick never settles (e.g. hung Supabase before guild loop). */
+const TICK_MUTEX_HARD_LIMIT_MS = STANDUP_TICK_TIMEOUT_MS;
+const SUPABASE_LOAD_TIMEOUT_MS = 15_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -149,12 +155,23 @@ export async function runStandupTick(
   now: Date = new Date(),
 ): Promise<StandupTickResult> {
   if (tickInFlight) {
-    console.warn("[cron/standup] tick skipped, previous still running");
-    return { results: [], skipped: true };
+    const elapsed = Date.now() - tickStartedAt;
+    if (elapsed >= TICK_MUTEX_HARD_LIMIT_MS) {
+      console.error(
+        `[cron/standup] forcing release of stuck tick mutex (${Math.round(elapsed / 1000)}s elapsed)`,
+      );
+      tickInFlight = null;
+      tickStartedAt = 0;
+    } else {
+      console.warn("[cron/standup] tick skipped, previous still running");
+      return { results: [], skipped: true };
+    }
   }
 
+  tickStartedAt = Date.now();
   const run = runStandupTickInner(config, now).finally(() => {
     tickInFlight = null;
+    tickStartedAt = 0;
   });
   tickInFlight = run;
   return run;
@@ -164,7 +181,34 @@ async function runStandupTickInner(
   config: AppConfig,
   now: Date,
 ): Promise<StandupTickResult> {
-  const targets = await getEnabledConfigs(config);
+  let timedOut = false;
+
+  const result = await Promise.race([
+    runStandupTickWork(config, now),
+    sleep(STANDUP_TICK_TIMEOUT_MS).then(() => {
+      timedOut = true;
+      return { results: [] } satisfies StandupTickResult;
+    }),
+  ]);
+
+  if (timedOut) {
+    console.error(
+      `[cron/standup] tick timed out after ${STANDUP_TICK_TIMEOUT_MS / 1000}s`,
+    );
+  }
+
+  return result;
+}
+
+async function runStandupTickWork(
+  config: AppConfig,
+  now: Date,
+): Promise<StandupTickResult> {
+  const targets = await withTimeout(
+    getEnabledConfigs(config),
+    SUPABASE_LOAD_TIMEOUT_MS,
+    `Timed out loading standup configs after ${SUPABASE_LOAD_TIMEOUT_MS / 1000}s`,
+  );
   const results: GuildTickResult[] = [];
 
   for (let i = 0; i < targets.length; i++) {

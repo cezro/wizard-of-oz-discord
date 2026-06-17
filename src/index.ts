@@ -81,6 +81,12 @@ app.post("/discord/interactions", async (c) => {
     const interaction = JSON.parse(body) as Parameters<
       typeof handleInteraction
     >[1];
+    if (interaction.type === 2) {
+      const sub = interaction.data?.options?.[0]?.name;
+      console.log(
+        `[discord/interactions] command=${interaction.data?.name ?? "?"} sub=${sub ?? "-"}`,
+      );
+    }
     const response = await handleInteraction(config, interaction);
     return c.json(response);
   } catch (error) {

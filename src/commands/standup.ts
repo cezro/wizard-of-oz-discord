@@ -22,6 +22,44 @@ import {
   resolveSummarizeDateParts,
 } from "../utils/timezone.js";
 
+async function runStartAndFollowUp(
+  config: AppConfig,
+  applicationId: string,
+  interactionToken: string,
+  guildId: string,
+): Promise<void> {
+  try {
+    const row = await getConfig(config, guildId);
+    if (!row) {
+      await editDeferredInteraction(
+        applicationId,
+        interactionToken,
+        "No configuration yet. Run `/standup-config` first.",
+      );
+      return;
+    }
+
+    const target = configRowToTarget(row);
+    const { pingedCount } = await runDailyReminder(config, target);
+    const pingNote =
+      pingedCount > 0
+        ? ` Pinged **${pingedCount}** reporter(s).`
+        : " No reporter role configured — text only.";
+
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      `Daily DSM reminder posted to <#${row.channel_id}>.${pingNote} (Cron \`last_reminder_date\` was not updated.)`,
+    );
+  } catch (error) {
+    await editDeferredInteraction(
+      applicationId,
+      interactionToken,
+      formatUserFacingDiscordError(error),
+    );
+  }
+}
+
 async function runSummarizeAndFollowUp(
   config: AppConfig,
   applicationId: string,
@@ -147,24 +185,16 @@ export async function handleStandupCommand(
           );
         }
 
-        const row = await getConfig(config, guildId);
-        if (!row) {
-          return ephemeral(
-            "No configuration yet. Run `/standup-config` first.",
-          );
+        const token = interaction.token;
+        if (!token) {
+          return ephemeral("Missing interaction token; try again.");
         }
 
-        const target = configRowToTarget(row);
-        const { pingedCount } = await runDailyReminder(config, target);
+        const applicationId =
+          interaction.application_id ?? config.discordApplicationId;
 
-        const pingNote =
-          pingedCount > 0
-            ? ` Pinged **${pingedCount}** reporter(s).`
-            : " No reporter role configured — text only.";
-
-        return ephemeral(
-          `Daily DSM reminder posted to <#${row.channel_id}>.${pingNote} (Cron \`last_reminder_date\` was not updated.)`,
-        );
+        void runStartAndFollowUp(config, applicationId, token, guildId);
+        return deferredEphemeral();
       }
 
       case "remind-missing": {
