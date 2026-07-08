@@ -1,5 +1,5 @@
 /** Pause outbound Discord HTTP after Cloudflare IP ban (error 1015). */
-const CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000;
+export const CIRCUIT_COOLDOWN_MS = 10 * 60 * 1000;
 
 export const CLOUDFLARE_1015_MESSAGE =
   "Discord is rate-limiting this server IP (Cloudflare 1015). Try again in a few minutes.";

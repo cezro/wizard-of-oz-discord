@@ -1,4 +1,7 @@
-import { isDiscordCircuitOpen } from "../discord/discord-circuit.js";
+import {
+  CIRCUIT_COOLDOWN_MS,
+  isDiscordCircuitOpen,
+} from "../discord/discord-circuit.js";
 import type { AppConfig } from "../config.js";
 import { runPipeline } from "../pipeline.js";
 import {
@@ -53,6 +56,13 @@ let tickInFlight: Promise<StandupTickResult> | null = null;
 let tickStartedAt = 0;
 
 const INTER_GUILD_STAGGER_MS = 2000;
+/**
+ * Grace window for reminder/nudge/summary schedule matches. Sized to outlast
+ * the Discord circuit-breaker cooldown so a scheduled action skipped during a
+ * Cloudflare 1015 outage still fires once the circuit closes, instead of
+ * silently missing its slot for the whole day.
+ */
+const SCHEDULE_GRACE_MINUTES = Math.ceil(CIRCUIT_COOLDOWN_MS / 60_000) + 1;
 const GUILD_TICK_TIMEOUT_MS = 120_000;
 const STANDUP_TICK_TIMEOUT_MS = 300_000;
 /** Force-release mutex if inner tick never settles (e.g. hung Supabase before guild loop). */
@@ -293,6 +303,7 @@ async function processGuildTick(
       local.minute,
       target.reminderHour,
       target.reminderMinute,
+      SCHEDULE_GRACE_MINUTES,
     ) &&
     target.lastReminderDate !== local.dateString
   ) {
@@ -320,6 +331,7 @@ async function processGuildTick(
       local.minute,
       nudgeSchedule.hour,
       nudgeSchedule.minute,
+      SCHEDULE_GRACE_MINUTES,
     ) &&
     target.lastNudgeDate !== local.dateString
   ) {
@@ -348,6 +360,7 @@ async function processGuildTick(
       local.minute,
       target.summaryHour,
       target.summaryMinute,
+      SCHEDULE_GRACE_MINUTES,
     ) &&
     target.lastSummaryDate !== local.dateString
   ) {
